@@ -3108,6 +3108,13 @@ end
 if isBox==1 or isBox==2 or isBox==3 then
 w=koMenuW(newMenu,newNumItem,w,size)
 end
+local menuHeight=h
+local pagination=menuItem.koPagination
+local footerHeight=44
+if pagination then
+w=160
+h=16+24*pagination.rows+footerHeight
+end
 if x1==-1 or x1==0 then
 if JY.Status==GAME_WMAP or JY.Status==GAME_WARWIN or JY.Status==GAME_WARLOSE then
 x1=koMapCenterX(w)
@@ -3125,6 +3132,17 @@ y1=16+(400-h)/2
 else
 y1=(CC.ScreenH-h)/2
 end
+end
+
+local pageButtons
+local pageDelta
+if pagination then
+local buttonWidth=math.floor((w-20)/2)
+local buttonY=y1+h-footerHeight-8
+pageButtons={
+ {x=x1+6,y=buttonY,w=buttonWidth,label="\129\071\130\066",delta=-1,enabled=pagination.page>1},
+ {x=x1+w-8-buttonWidth,y=buttonY,w=buttonWidth,label="\129\077\130\077",delta=1,enabled=pagination.page<pagination.count},
+}
 end
 
 local function redraw(flag)
@@ -3154,7 +3172,7 @@ lib.SetClip(x1,y1+8+24*math.max(0,(num-3)),x1+w,y1+8+24*num+8)
 lib.PicLoadCache(4,70*2,x1,y1+14+24*num-110,1)
 lib.SetClip(0,0,0,0)
 elseif isBox==3 then
-koFrame(63*2,96,184,x1,y1,w,16+24*num)
+koFrame(63*2,96,184,x1,y1,w,h)
 elseif isBox==4 then
 lib.SetClip(x1,y1,x1+w,y1+h)
 lib.PicLoadCache(4,59*2,x1,y1,1)
@@ -3248,6 +3266,15 @@ else
 DrawString(x1+dx+x_off+CC.MenuBorderPixel,y1+y_off+CC.MenuBorderPixel+(i-start)*(size+row_off+CC.RowPixel),menustr,drawColor,size)
 end
 end
+if pageButtons then
+for _,button in ipairs(pageButtons) do
+local highlighted=button.enabled and MOUSE.IN(button.x,button.y,button.x+button.w,button.y+22)
+koBarW((highlighted and 65 or 64)*2,82,button.x,button.w,button.y)
+DrawString(button.x+(button.w-#button.label*8)/2,button.y+3,button.label,button.enabled and color or M_Gray,size)
+end
+local pageText=string.format("(%d/%d)",pagination.page,pagination.count)
+DrawString(x1+(w-#pageText*8)/2,pageButtons[1].y+25,pageText,color,size)
+end
 if flag then
 lib.Background(x1,y1,x1+w,y1+h,128)
 end
@@ -3270,7 +3297,17 @@ end
 if JY.koMenuClose and MOUSE.CLICK(JY.koMenuClose[1],JY.koMenuClose[2],JY.koMenuClose[3],JY.koMenuClose[4]) then--ko: the button that opened this menu closes it again
 wait=false
 end
-if mx>x1+6 and mx<x1+w-6 and my>y1+h_off and my<y1+h-h_off then
+if wait and pageButtons then
+for _,button in ipairs(pageButtons) do
+if button.enabled and MOUSE.CLICK(button.x,button.y,button.x+button.w,button.y+22) then
+pageDelta=button.delta
+wait=false
+PlayWavE(0)
+break
+end
+end
+end
+if wait and mx>x1+6 and mx<x1+w-6 and my>y1+h_off and my<y1+menuHeight-h_off then
 current=math.modf((my-y1-h_off)/(size+CC.RowPixel+row_off))
 if MOUSE.HOLD(x1+7,y1+h_off+(size+CC.RowPixel+row_off)*current,x1+w-7,y1+h_off+(size+CC.RowPixel+row_off)*(current+1)) then
 current=limitX(start+current,1,newNumItem)
@@ -3324,12 +3361,13 @@ else
 current=0
 end
 end
-if returnValue==0 then
+if returnValue==0 and not pageDelta then
 PlayWavE(1)
 end
 if not JY.koMenuKeep then lib.LoadSur(sid) end--ko 5.0: the load list keeps itself drawn behind its confirm box
 lib.FreeSur(sid)
 if JY.Status==GAME_START and isBox==20 and not rawget(_G,"koRemindSave") then koTitleAnimRelease() end
+if pageDelta then return 0,pageDelta end
 return returnValue
 end
 
@@ -15688,16 +15726,33 @@ local function koRosterClasses(ids)
 end
 
 local function koRosterPicker(values,label,current)
- local menu={}
- for row,value in ipairs(values) do
-  menu[row]={label(value),nil,value==current and 2 or 1}
+ local pageSize=5
+ local pageCount=math.ceil(#values/pageSize)
+ local page=1
+ for i,value in ipairs(values) do
+  if value==current then
+   page=math.ceil(i/pageSize)
+   break
+  end
  end
- local style=#menu>8 and 6 or 3
- if style==6 then
-  for _,row in ipairs(menu) do row[1]="@"..row[1] end
+ while pageCount>0 do
+  local first=(page-1)*pageSize+1
+  local last=math.min(first+pageSize-1,#values)
+  local menu={}
+  for i=first,last do
+   local value=values[i]
+   menu[#menu+1]={label(value),nil,value==current and 2 or 1}
+  end
+
+  -- Keep the page data with the rows so menu wrappers forward it too.
+  menu.koPagination={page=page,count=pageCount,rows=pageSize}
+  local row,delta=ShowMenu(menu,#menu,0,0,0,0,0,3,1,16,M_White,C_Name)
+  if delta then
+   page=page+delta
+  else
+   return row>0 and values[first+row-1] or nil
+  end
  end
- local row=ShowMenu(menu,#menu,math.min(8,#menu),0,0,0,0,style,1,16,M_White,C_Name)
- return values[row]
 end
 
 local function koRosterPickSort(current,costAvailable)
