@@ -1,0 +1,2 @@
+# Preserve the app's original file bytes on every checkout.
+* -text
