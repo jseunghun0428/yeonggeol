@@ -309,7 +309,8 @@ local p=JY.Person[pid]
 local id=(koWI and koWI(pid)) or pid
 local fig=koCF and koCF(pid)
 local pv=koPS and koPS(pid)
-if p and pv and koUniqueCity[pv] then keep[pid]=p[XS] p[XS]=KO_CITY_BASE+pv--ko 11-08: own city slot
+if p and koOfficerEdited(pid,1) then -- editor-selected city figure is already in the person record
+elseif p and pv and koUniqueCity[pv] then keep[pid]=p[XS] p[XS]=KO_CITY_BASE+pv--ko 11-08: own city slot
 elseif p and koUniqueCity[id] and (not CONFIG.koCamp or string.find(CC.koGenEdit or "",",c"..id..",",1,true)) then keep[pid]=p[XS] p[XS]=KO_CITY_BASE+id--ko 6.0: a story's own genedit city sprite first
 elseif p and fig then keep[pid]=p[XS] p[XS]=fig
 elseif p and koUniqueCity[id] then keep[pid]=p[XS] p[XS]=KO_CITY_BASE+id end
@@ -317,7 +318,7 @@ end
 else
 for pid in pairs(koUniqueCity) do
 local p=JY.Person[pid]
-if p then keep[pid]=p[XS] p[XS]=KO_CITY_BASE+pid end
+if p and not koOfficerEdited(pid,1) then keep[pid]=p[XS] p[XS]=KO_CITY_BASE+pid end
 end
 end
 local ok,err=pcall(koDrawSMapBase)

@@ -26,7 +26,9 @@ local function repairVisuals()
  if rawget(_G,"koWujeRepairClasses") then koWujeRepairClasses() end
  for _,p in ipairs(PERSON) do
   local who=JY.Person[p[1]]
-  who[IDENT]=p[1] who[FACE]=p[3] who[SHAPE]=p[4]
+  who[IDENT]=p[1]
+  if not koOfficerEdited(p[1],2) then who[FACE]=p[3] end
+  if not koOfficerEdited(p[1],1) then who[SHAPE]=p[4] end
  end
 end
 local function configure()

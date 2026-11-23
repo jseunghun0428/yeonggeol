@@ -21,7 +21,7 @@ local NAME="\208\213\195\251"-- 姓名
 local FIG="\208\206\207\243"-- 形象 (city figure)
 -- 10-10: the figure a person is really drawn with (unique addon: listed persons have their own city figure KO_CITY_BASE+pid), so
 --  townsfolk who share a stored figure but have their own sprites (산적 311~313) can stand side by side
-local function koTownFig(id) local f=rawget(_G,"koWujeIdentity") local src=(f and f(id)) or id local u=rawget(_G,"koUniqueCity") local ps=rawget(_G,"koGenPrivSlot") local pv=ps and ps(id) if pv and u and u[pv] then return (rawget(_G,"KO_CITY_BASE") or 300)+pv end if u and u[src] and (not CONFIG.koCamp or string.find(CC.koGenEdit or "",",c"..src..",",1,true)) then return (rawget(_G,"KO_CITY_BASE") or 300)+src end local cf=rawget(_G,"koWujeCityFigure") local fig=cf and cf(id) if fig then return fig end if u and u[src] then return (rawget(_G,"KO_CITY_BASE") or 300)+src end return JY.Person[id][FIG] end
+local function koTownFig(id) if koOfficerEdited(id,1) then return JY.Person[id][FIG] end local f=rawget(_G,"koWujeIdentity") local src=(f and f(id)) or id local u=rawget(_G,"koUniqueCity") local ps=rawget(_G,"koGenPrivSlot") local pv=ps and ps(id) if pv and u and u[pv] then return (rawget(_G,"KO_CITY_BASE") or 300)+pv end if u and u[src] and (not CONFIG.koCamp or string.find(CC.koGenEdit or "",",c"..src..",",1,true)) then return (rawget(_G,"KO_CITY_BASE") or 300)+src end local cf=rawget(_G,"koWujeCityFigure") local fig=cf and cf(id) if fig then return fig end if u and u[src] then return (rawget(_G,"KO_CITY_BASE") or 300)+src end return JY.Person[id][FIG] end
 KT.ARROW={ul=119,ur=120,dl=121,dr=122}
 KT.ADIR={ul=2,ur=0,dl=1,dr=3}-- the walking dir each arrow points to
 KT.OPP={[0]=1,0,3,2}

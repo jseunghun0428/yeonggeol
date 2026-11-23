@@ -44,7 +44,7 @@ local function sync()
 	local A=koStatAlias[mode()] or {}
 	local n=0
 	for pid,e in pairs(A) do
-		if pid>0 and pid<JY.PersonNum then
+		if pid>0 and pid<JY.PersonNum and not koOfficerEdited(pid,8) then
 			local p=JY.Person[pid]
 			local w,z,t=e[5],e[6],e[7]
 			local a,b,c=editOf(e[1])

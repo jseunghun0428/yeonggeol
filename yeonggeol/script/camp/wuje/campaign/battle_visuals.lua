@@ -8,7 +8,7 @@ local done={}
 function koWujeClassDone(t) if t~=nil then done={} if type(t)=="table" then for k,v in pairs(t) do if v then done[k]=true end end end end return done end
 local function repair(pid)
  local c=CHANGES[pid] local p=JY.Person[pid]
- if not c or not p or p[LORD]~=1 or done[pid] then return end
+ if not c or not p or p[LORD]~=1 or done[pid] or koOfficerEdited(pid,4) then return end
  done[pid]=true
  local bz=p[BZ] local target=nil
  if bz==c[1] then target=c[2]

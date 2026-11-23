@@ -77,38 +77,43 @@ local function gSync()
 end
 local function everRow(r) return gGet(r) or (have() and getbit(EVER,r)) end
 -- ---------------------------------------------------------------- 인물 → 줄
-local NAMEROW={}
-for r,d in ipairs(DATA) do for _,n in ipairs(d[1]) do NAMEROW[n]=NAMEROW[n] or r end end
-koAwakeOn={}-- pid -> 데이터 줄 (지금 각성, 내 편 판정은 쓰는 쪽)
-koAwakeSk={}-- pid -> {특기 번호=true}
+local roster=dofile(CONFIG.ScriptPath.."addon/awakeperson_roster.lua")
+koAwakeOn={}
+koAwakeSk={}
 local ROWOF={}
-local function rowOf(pid)
-	local p=JY.Person[pid]
-	if not p then return nil end
-	if pid>=511 and pid<=510+NGEN then
-		if (p[NAME] or "")=="" then return nil end
-		return GENBASE+pid-510,genRow(pid)
-	end
-	local fix=koAwakeFix and koAwakeFix[story()]
-	local r=fix and fix[pid]
-	if not r then
-		r=NAMEROW[p[NAME] or ""]
-		-- 같은 이름 둘(우금 于禁 · 牛金)의 줄: 번호표에 없는 칸(술집 사본 421~)은 도감처럼 이름이 같은 첫 도감 항목의 번호로 고름
-		--  (11-10 제보: 영걸전 술집 우금 = 牛金 171 인데 기본값 于禁 줄이 붙어 도감(배수)과 실제(견고)가 달랐음)
-		if r and fix then
-			local hit=false
-			for _,v in pairs(fix) do if v==r then hit=true break end end
-			if hit then
-				local c=nil
-				for _,b in ipairs(rawget(_G,"koRecBook") or {}) do
-					if JY.Person[b] and JY.Person[b][NAME]==p[NAME] then c=b break end
-				end
-				r=(c and fix[c]) or koAwakeFixDefault
+local edits={}
+local function loadEdits()
+	edits={}
+	local path=string.gsub(CC.R_GRPFilename[0],"newgame%.grp$","officer_awake.txt")
+	local file=io.open(path,"r")
+	if not file then return end
+	for line in file:lines() do
+		local id,list=string.match(line,"^(%d+)([%s%d]*)$")
+		if id then
+			local skills={}
+			for value in string.gmatch(list,"%d+") do
+				local sk=tonumber(value)
+				if sk>0 and JY.Skill[sk] then skills[#skills+1]=sk end
 			end
+			edits[tonumber(id)]=skills
 		end
 	end
+	file:close()
+end
+
+local function effectiveData(pid,d)
+	local skills=edits[pid]
+	if not d or not skills then return d end
+	local names={}
+	for _,sk in ipairs(skills) do names[#names+1]=JY.Skill[sk][SNAME] end
+	return {d[1],d[2],d[3],d[4],skills,table.concat(names,"\161\164")}
+end
+
+local function rowOf(pid)
+	local r=roster(pid,JY.Person,story(),rawget(_G,"koRecBook"))
 	if not r then return nil end
-	return r,DATA[r]
+	local d=(r>GENBASE and r<=GENBASE+NGEN) and genRow(pid) or DATA[r]
+	return r,effectiveData(pid,d)
 end
 local function offMode()
 	if rawget(_G,"koFoeActive") and koFoeActive() then return true end
@@ -296,6 +301,7 @@ local lr=rawget(_G,"LoadRecord")
 if type(lr)=="function" then
 	function LoadRecord(...)
 		local r=table.pack(lr(...))
+		loadEdits()
 		if have() then pcall(migrateDup) end
 		local ok,err=pcall(koAwakeRebuild)
 		if not ok then koAddonLog("awakeperson load: "..tostring(err)) end
@@ -405,7 +411,7 @@ function koAwakeRun()
 		local pid=pick()
 		if pid<=0 then return end
 		local r=ROWOF[pid]
-		local d=(r>GENBASE and r<=GENBASE+NGEN) and genRow(pid) or DATA[r]
+		local d=koAwakeOn[pid] or effectiveData(pid,(r>GENBASE and r<=GENBASE+NGEN) and genRow(pid) or DATA[r])
 		local p=JY.Person[pid]
 		if koAwakeOn[pid] then
 			if WarDrawStrBoxYesNo(p[NAME].."  \130\069\131\123 \130\101*"..info(d).."*\130\069\131\123\129\083 \132\067\137\066\132\116\129\076\129\089? (\131\103\131\098 \137\066\131\096\133\072\130\067 \136\102\129\087\129\076\129\077)",M_White,true) then
@@ -450,7 +456,7 @@ if rawget(_G,"koRecTabs") then
 	end
 	local function page(e)
 		local c,r=e[1],e[2]
-		local d=DATA[r]
+		local d=effectiveData(c,DATA[r])
 		local p=JY.Person[c]
 		local w,h=420,240
 		local x,y=math.floor((CC.ScreenW-w)/2),math.floor((CC.ScreenH-h)/2)
@@ -490,7 +496,7 @@ if rawget(_G,"koRecTabs") then
 			if not e then break end
 			local yy=y0+30+(k-1)*27
 			if k%2==0 then lib.Background(c.ox+24,yy-2,c.ox+744,yy+21,190,RGB(46,35,24)) end
-			local d=DATA[e[2]]
+			local d=effectiveData(e[1],DATA[e[2]])
 			local done=everRow(e[2])
 			if done then c.txt(c.ox+24,yy,"\130\069",M_Yellow) end
 			c.txt(c.ox+52,yy,JY.Person[e[1]][NAME],done and M_Yellow or M_White)

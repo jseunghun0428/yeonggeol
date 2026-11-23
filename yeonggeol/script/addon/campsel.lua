@@ -394,7 +394,7 @@ local function fixTf()
 if CONFIG.koCamp~="yuanshao" or not JY or not JY.Person then return end
 for pid,t in pairs(YS) do
 local p=JY.Person[pid]
-if p and p[TF]==t[1] then
+if p and not koOfficerEdited(pid,16) and p[TF]==t[1] then
 p[TF]=t[2]
 for k=1,6 do if p[SP..k]==t[2] then p[SP..k]=t[1] break end end
 end
@@ -423,10 +423,14 @@ local SP,BZ,FACE,NAME="\204\216\188\188","\177\248\214\214","\205\183\207\241\18
 local function fixDw()
 if CONFIG.koCamp~="wuje" or not JY or not JY.Person or (JY.PersonNum or 0)<=387 then return end
 local p,q=JY.Person[8],JY.Person[387]
+local skip={}
+if koOfficerEdited(8,1) then skip[F[1]]=true end
+if koOfficerEdited(8,2) then skip[FACE]=true end
+if koOfficerEdited(8,8) then for i=4,8 do skip[F[i]]=true end end
 if not p or not q or p[NAME]~=q[NAME] or not (p[SP.."1"]==8 and p[SP.."2"]==9 and p[SP.."3"]==10) then return end-- 옛 특기 묶음(8 9 10)일 때만: 얼굴은 wuje_campaign PERSON 표가 불러올 때 먼저 24 로 바꿈
-for _,f in ipairs(F) do pcall(function() p[f]=q[f] end) end
-for k=1,6 do p[SP..k]=q[SP..k] end
-if p[BZ]>=1 and p[BZ]<=3 then p[BZ]=q[BZ] end
+for _,f in ipairs(F) do if not skip[f] then pcall(function() p[f]=q[f] end) end end
+if not koOfficerEdited(8,16) then for k=1,6 do p[SP..k]=q[SP..k] end end
+if not koOfficerEdited(8,4) and p[BZ]>=1 and p[BZ]<=3 then p[BZ]=q[BZ] end
 pcall(ReSetAttrib,8,false)
 end
 rawset(_G,"koWjDianweiFix",fixDw)

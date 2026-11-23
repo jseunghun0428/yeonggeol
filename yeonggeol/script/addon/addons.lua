@@ -69,4 +69,5 @@ return {
 {"recsave",true}, -- ko 6.0 (10-27): 기기 공통 기록(시련·자유 모드·무술 대회 ...)을 data/save/ko_records.lua 에도 저장, 새 판에서 세이브와 함께 이어짐 — 맨 끝(koSave 감쌈, 모든 saveKeys 뒤)
 {"uhui",true}, -- 군웅록 (11-06): 숨은 무장 우희 · 외전 해하의 밤
 {"bgm",true}, -- 군웅록 (11-03): 새 배경 음악 (sound/B###.mp3 133곡, 이야기 · 모드별 묶음, 기능설정 「배경 음악」 새 곡/원본) — 맨 끝(모드 함수 감쌈)
+{"officer_editor",true}, -- Apply explicit developer battle appearances after the normal sprite rules.
 }

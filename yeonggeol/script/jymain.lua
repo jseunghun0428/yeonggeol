@@ -2185,6 +2185,24 @@ end
 end
 end
 
+function koOfficerEdited(pid,flag)
+local edit=JY.OfficerOverrides and JY.OfficerOverrides[pid]
+return edit and math.floor(edit.mask/flag)%2==1
+end
+
+local function koOfficerReadOverrides()
+JY.OfficerOverrides={}
+local path=string.gsub(CC.R_GRPFilename[0],"newgame%.grp$","officer_overrides.txt")
+local file=io.open(path,"r")
+if not file then return end
+for line in file:lines() do
+local pid,mask,war=string.match(line,"^(%d+) (%d+) (%-?%d+)$")
+pid,mask,war=tonumber(pid),tonumber(mask),tonumber(war)
+if pid and pid>0 and pid<JY.PersonNum then JY.OfficerOverrides[pid]={mask=mask,war=war} end
+end
+file:close()
+end
+
 function LoadRecord(id)-- 读取游戏进度
 Dark()
 koHook("record_load")--ko 3.1
@@ -2290,6 +2308,25 @@ end
 setmetatable(JY.Person[i],meta_t)
 end
 end
+koOfficerReadOverrides()
+local officerValues={}
+if id==0 or id==11 then
+-- Keep editor choices through legacy fixes, including the temporary new-game reload.
+local fields={
+[2]={"\205\183\207\241\180\250\186\197"},
+[4]={"\177\248\214\214"},
+[16]={"\204\236\184\179","\204\216\188\1881","\204\216\188\1882","\204\216\188\1883","\204\216\188\1884","\204\216\188\1885","\204\216\188\1886"}
+}
+for pid in pairs(JY.OfficerOverrides) do
+local values={}
+for flag,keys in pairs(fields) do
+if koOfficerEdited(pid,flag) then
+for _,key in ipairs(keys) do values[key]=JY.Person[pid][key] end
+end
+end
+officerValues[pid]=values
+end
+end
 if not rawget(_G,"koCamp") then--ko 6.0 campaigns: the person repairs below are for the Liu Bei story only
 --ko 388 identity: name/class/innate are SAVE-resident, so refresh them from mod data on every load
 if JY.PersonNum>388 then
@@ -2364,17 +2401,33 @@ end--ko 6.0 campaigns
 JY.BingzhongNum=math.floor((idx[3]-idx[2])/CC.BingzhongSize)--兵种 /读取newgamesave
 JY.Data_Bingzhong=Byte.create(CC.BingzhongSize*JY.BingzhongNum)
 Byte.loadfile(JY.Data_Bingzhong,CC.R_GRPFilename[0],idx[2],CC.BingzhongSize*JY.BingzhongNum)
-for i=0,JY.BingzhongNum-1 do
-JY.Bingzhong[i]={}
-local meta_t={
+local function bindTroopRows(first,count,data)
+for i=0,count-1 do
+local slot=first+i
+JY.Bingzhong[slot]=setmetatable({},{
 __index=function(t,k)
-return GetDataFromStruct(JY.Data_Bingzhong,i*CC.BingzhongSize,CC.Bingzhong_S,k)
+return GetDataFromStruct(data,i*CC.BingzhongSize,CC.Bingzhong_S,k)
 end,
 __newindex=function(t,k,v)
-SetDataFromStruct(JY.Data_Bingzhong,i*CC.BingzhongSize,CC.Bingzhong_S,k,v)
+SetDataFromStruct(data,i*CC.BingzhongSize,CC.Bingzhong_S,k,v)
+end})
 end
-}
-setmetatable(JY.Bingzhong[i],meta_t)
+end
+JY.Bingzhong={}
+bindTroopRows(0,JY.BingzhongNum,JY.Data_Bingzhong)
+-- The shared extension keeps the original newgame/save section offsets intact.
+local troopPath=CONFIG.DataPath.."officer_troops.grp"
+local troopFile=io.open(troopPath,"rb")
+if troopFile then
+local bytes=troopFile:seek("end")
+troopFile:close()
+if bytes and bytes>0 and bytes%CC.BingzhongSize==0 and JY.BingzhongNum+bytes/CC.BingzhongSize<=32768 then
+local count=bytes/CC.BingzhongSize
+local data=Byte.create(bytes)
+Byte.loadfile(data,troopPath,0,bytes)
+bindTroopRows(JY.BingzhongNum,count,data)
+JY.BingzhongNum=JY.BingzhongNum+count
+end
 end
 JY.SceneNum=math.floor((idx[4]-idx[3])/CC.SceneSize)--场景
 JY.Data_Scene=Byte.create(CC.SceneSize*JY.SceneNum)
@@ -2571,6 +2624,9 @@ SetDataFromStruct(JY.Data_Skill,i*CC.SkillSize,CC.Skill_S,k,v)
 end
 }
 setmetatable(JY.Skill[i],meta_t)
+end
+for pid,values in pairs(officerValues) do
+for key,value in pairs(values) do JY.Person[pid][key]=value end
 end
 koSyncPromotionItems()
 collectgarbage()

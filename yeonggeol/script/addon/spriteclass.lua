@@ -206,7 +206,7 @@ function koSpriteClassFix()
 	if JY.Status==GAME_WMAP and War and War.Person then for _,v in pairs(War.Person) do if v and v.id then inWar[v.id]=true end end end
 	for pid=1,(JY.PersonNum or 0)-1 do
 		local s=src(pid)
-		if inWar[pid] then s=nil end
+		if inWar[pid] or koOfficerEdited(pid,4) then s=nil end
 		local p=JY.Person[pid]
 		if s and p and p[LORD]==1 and p[BZ]~=origBz(s,pid) and not (not campWI() and OLDNG[s] and OLDNG[s][p[BZ]]) then s=nil end
 		-- 군웅록 11-16 (카페 제보 1.0.34 「곽가를 요술사로 바꿔도 단병으로」): 이야기 모드의 우리 편은 처음 병종 옮기기를 battle_visuals 가
@@ -226,7 +226,7 @@ function koSpriteClassFix()
 		for pid=391,396 do
 			local p=JY.Person[pid]
 			local nb=GetDataFromStruct(JY.Data_Person_Base,pid*CC.PersonSize,CC.Person_S,BZ)
-			if p and p[LORD]~=1 and nb and nb>0 and p[BZ] and famOf(p[BZ])~=famOf(nb) then p[BZ]=nb end
+			if p and not koOfficerEdited(pid,4) and p[LORD]~=1 and nb and nb>0 and p[BZ] and famOf(p[BZ])~=famOf(nb) then p[BZ]=nb end
 		end
 	end
 end
