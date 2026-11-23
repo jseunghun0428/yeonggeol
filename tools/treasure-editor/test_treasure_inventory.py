@@ -19,6 +19,7 @@ INAME="\195\251\179\198"
 TIER="\206\222\211\195\051"
 CC={PersonSize=152,koNG={selall=function() return {item=true} end}}
 JY={PersonNum=802,Person={},Data_Person={},Base={[TIER]=4},Item={}}
+M_White,GAME_WMAP=0,1
 for i=1,801 do JY.Person[i]={[LORD]=0} end
 for i=1,1003 do JY.Item[i]={[INAME]="item"..i} end
 JY.Person[1][LORD]=1
@@ -179,6 +180,22 @@ local reset=CC.koNG.reset
 assert(reset({item=true}))
 assert(held(5,222) and warehouse(160).iid==61 and not held(1,61))
 assert(#notice==0 and gold==0)
+''')
+
+    def test_optional_addons_can_be_absent_with_strict_globals(self):
+        self.lua.execute(br'''
+for _,name in ipairs({"koItemBaseId","koStoryParkedTreasureHolders","koStoreList",
+                      "koPackBag","koGearInvalidateOwnership","koStorePut","koStoryParked"}) do
+ rawset(_G,name,nil)
+end
+setmetatable(_G,{
+ __index=function(_,name) error("undeclared read: "..name) end,
+ __newindex=function(_,name) error("undeclared write: "..name) end,
+})
+bag(1,1,61) bag(1,2,61)
+LoadRecord(2)
+assert(held(1,61) and JY.Person[1][ITEM..2]==0 and gold==1000)
+assert(GetItem(1,61) and gold==2000)
 ''')
 
 

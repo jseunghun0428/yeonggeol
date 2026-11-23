@@ -6,8 +6,8 @@ local ITEM="\181\192\190\223"
 local TIER="\206\222\211\195\051"
 local EQUIP={"\206\228\198\247","\183\192\190\223","\184\168\214\250"}
 local MARK_VERSION=19071
-if not koBogamList then dofile(CONFIG.ScriptPath.."addon/bogam_data.lua") end
-local MOVE=koGearMove or {}
+if not rawget(_G,"koBogamList") then dofile(CONFIG.ScriptPath.."addon/bogam_data.lua") end
+local MOVE=rawget(_G,"koGearMove") or {}
 local families,byId={},{}
 for _,row in ipairs(koBogamList or {}) do
  local family={index=#families+1,owner=row[4]}
@@ -29,7 +29,7 @@ end
 
 local function classify(item)
  if not item or item<=0 then return end
- local base=koItemBaseId and koItemBaseId(item) or item
+ local base=rawget(_G,"koItemBaseId") and koItemBaseId(item) or item
  return byId[MOVE[base] or base],MOVE[base] or base,base~=item
 end
 
@@ -113,7 +113,7 @@ end
 
 local function collect(family)
  local result,party={},{}
- local parked=koStoryParkedTreasureHolders and koStoryParkedTreasureHolders() or {}
+ local parked=rawget(_G,"koStoryParkedTreasureHolders") and koStoryParkedTreasureHolders() or {}
  local backups={}
  for _,pid in pairs(parked) do backups[pid]=true end
  for pid=1,JY.PersonNum-1 do
@@ -124,7 +124,7 @@ local function collect(family)
    end
   end
  end
- for _,slot in ipairs(koStoreList and koStoreList() or {}) do
+ for _,slot in ipairs(rawget(_G,"koStoreList") and koStoreList() or {}) do
   local entry=record(nil,nil,slot.iid,nil,slot)
   if entry and (not family or family==entry.family) then result[#result+1]=entry end
  end
@@ -175,18 +175,18 @@ end
 
 local function refresh(changed)
  for pid,worn in pairs(changed) do
-  if koPackBag then koPackBag(pid) end
+  if rawget(_G,"koPackBag") then koPackBag(pid) end
   if worn then
    local wornOnly={}
    for _,entry in ipairs(records(pid)) do
     if entry.key==entry.worn then wornOnly[#wornOnly+1]=entry end
    end
    local ok,err=pcall(ReSetAttrib,pid,false)
-   if not ok and koAddonLog then koAddonLog("treasure equipment refresh: "..tostring(err)) end
+   if not ok and rawget(_G,"koAddonLog") then koAddonLog("treasure equipment refresh: "..tostring(err)) end
    for _,entry in ipairs(wornOnly) do JY.Person[pid][entry.key]=entry.item end
   end
  end
- if koGearInvalidateOwnership then koGearInvalidateOwnership() end
+ if rawget(_G,"koGearInvalidateOwnership") then koGearInvalidateOwnership() end
 end
 
 local function itemName(entry)
@@ -313,7 +313,7 @@ local function place(entry,owner,changed)
   JY.Person[owner][key]=entry.item
   changed[owner]=true
  else
-  if not koStorePut or not koStorePut(entry.item) then return false end
+  if not rawget(_G,"koStorePut") or not koStorePut(entry.item) then return false end
  end
  write(entry,0,changed)
  if owner and JY.Person[owner][LORD]~=1 then mark(entry.family,owner,entry.item) end
@@ -377,7 +377,7 @@ function ModifyForce(pid,fid,...)
  local joining=not resetting and loadDepth==0 and active() and (fid or 1)==1
                and pid and JY.Person[pid] and JY.Person[pid][LORD]~=1
  local result=table.pack(rawModify(pid,fid,...))
- if joining and JY.Person[pid][LORD]==1 and not (koStoryParked and koStoryParked(pid)) then
+ if joining and JY.Person[pid][LORD]==1 and not (rawget(_G,"koStoryParked") and koStoryParked(pid)) then
   clean(pid)
   for _,family in ipairs(families) do if getMark(family)==pid then mark(family) end end
  end

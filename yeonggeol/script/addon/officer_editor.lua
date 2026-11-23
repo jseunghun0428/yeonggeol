@@ -40,7 +40,7 @@ function GetPic(pid,enemy,friend)
 	local slot=koOfficerBattleSlot(pid,JY.Person[pid][troop])
 	if slot then
 		local fallback=getPic(pid,enemy,friend)
-		KO_SPR_FALLBACK=fallback<=65535 and fallback or 0
+		rawset(_G,"KO_SPR_FALLBACK",fallback<=65535 and fallback or 0)
 		JY.Person[pid][sprite]=slot
 		return slot
 	end

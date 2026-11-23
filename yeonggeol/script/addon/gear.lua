@@ -127,7 +127,7 @@ if rawget(_G,"koStoreList") then for _,s in ipairs(koStoreList()) do t[s.iid]=tr
 OWNSET=t
 return t
 end
-local function ownedId(id) if not id or id<=0 then return false end return ownSet()[id]==true or (koTreasureHasReserved and koTreasureHasReserved(id)) end
+local function ownedId(id) if not id or id<=0 then return false end return ownSet()[id]==true or (rawget(_G,"koTreasureHasReserved") and koTreasureHasReserved(id)) end
 local function owned(e) return ownedId(e[2]) or ownedId(e[3]) end
 local function box(s) WarDrawStrBoxConfirm(s,M_White,JY.Status~=GAME_WMAP) end
 
@@ -355,7 +355,7 @@ local ch=false
 -- 남의 전용 보물은 비우고, 자기 것은 둠 (관우 · 장비는 newgame 가방에 원래 듦, 적일 때 받은 자기 것도 합류하면 그대로 지급분) — 자기 ★ 은 원본으로
 for s=1,8 do
 local v=p[ITEM..s] local k=v and (BYITEM[base(v)] or BYSTAR[base(v)])
-if k and not (koTreasureKeeps and koTreasureKeeps(i,v)) then
+if k and not (rawget(_G,"koTreasureKeeps") and koTreasureKeeps(i,v)) then
 local sr=(D[k][1]~=p[NAME]) and sharedRow(k,p[NAME]) or nil
 if D[k][1]~=p[NAME] and not sr then p[ITEM..s]=0 ch=true
 elseif v==D[k][3] and not earned(k) and not (sr and earned(sr)) then p[ITEM..s]=D[k][2] ch=true end
@@ -394,7 +394,7 @@ for s=1,8 do
 local v=p[ITEM..s] local k=v and v>0 and BYITEM[v]
 local sr=k and D[k][1]~=p[NAME] and sharedRow(k,p[NAME]) or nil-- 11-16: 함께 쓰는 줄(조운)도 각성 표시가 있으면 ★ 으로 (지워진 청강검★ 되찾기)
 if k and D[k][3]>0 and (D[k][1]==p[NAME] or sr) and (earned(k) or (sr and earned(sr))) and not starAnywhere(D[k][3])
-and not (p[LORD]~=1 and koTreasureKeeps and koTreasureKeeps(i,v)) then
+and not (p[LORD]~=1 and rawget(_G,"koTreasureKeeps") and koTreasureKeeps(i,v)) then
 p[ITEM..s]=D[k][3]
 for _,q in ipairs(EQUIP) do if p[q]==v then p[q]=D[k][3] end end
 pcall(ReSetAttrib,i,false)
@@ -413,7 +413,7 @@ if not have() then return end
 for _,v in pairs(War.Person or {}) do
 if v.enemy and v.id and JY.Person[v.id][LORD]~=1 then
 local p=JY.Person[v.id] local ch=false
-for s=1,8 do local k=BYSTAR[p[ITEM..s] or 0] if k and D[k][1]==p[NAME] and earned(k) and not (koTreasureKeeps and koTreasureKeeps(v.id,p[ITEM..s])) then p[ITEM..s]=D[k][2] ch=true end end
+for s=1,8 do local k=BYSTAR[p[ITEM..s] or 0] if k and D[k][1]==p[NAME] and earned(k) and not (rawget(_G,"koTreasureKeeps") and koTreasureKeeps(v.id,p[ITEM..s])) then p[ITEM..s]=D[k][2] ch=true end end
 for _,q in ipairs(EQUIP) do local k=BYSTAR[p[q] or 0] if k and D[k][1]==p[NAME] and earned(k) then p[q]=D[k][2] ch=true end end
 if ch then pcall(ReSetAttrib,v.id,false) OWNSET=nil end
 end
@@ -773,7 +773,7 @@ local DUPGOLD=1000
 local function storyGive(raw,who,pid,item,...)
 item=MOVE[item] or item
 local k=BYITEM[item]
-if koTreasureStoryGive and koTreasureStoryGive(pid,item) then
+if rawget(_G,"koTreasureStoryGive") and koTreasureStoryGive(pid,item) then
 if k then setGift(k) end
 OWNSET=nil
 return true

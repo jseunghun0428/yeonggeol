@@ -739,6 +739,7 @@ CC.R_GRPFilename[13]=CONFIG.Save.."auto2.sav"--ko 3.1: the two older auto saves 
 CC.R_GRPFilename[14]=CONFIG.Save.."auto3.sav"
 CC.R_GRPFilename[18]=CONFIG.Save.."clear.sav"--ko 5.0 (koNGPlus): the latest 종횡 clear (15 exp, 16 rewind, 17 town)
 --ko 3.1: addons (script\addon\addons.lua lists them; _core.lua holds the loader, hooks and registries)
+rawset(_G,"koTactics",dofile(CONFIG.ScriptPath.."addon/tactic_editor.lua"))
 dofile(CONFIG.ScriptPath.."addon/_core.lua")
 koAddon.settings[1]={key="koAutoSave",label="\133\120\130\108 \133\102\131\097",opts={{"\133\122",1},{"\133\117",0}},default=1}--ko 3.1: the base's own row (자동 저장 켬/끔)
 koAddon.settings[2]={key="koDuelPick",label="\133\073\131\071\137\083 \129\113\130\108\129\118\129\074",opts={{"\133\122",1},{"\133\117",0}},default=1}--ko 3.1: 일기토 수동조작 켬(카드 고르기)/끔(원작 v12846 그대로: 화면 없이 정해진 승리). 무술 대회는 항상 켬
@@ -2641,7 +2642,6 @@ end
 }
 setmetatable(JY.Skill[i],meta_t)
 end
-if not koTactics then koTactics=dofile(CONFIG.ScriptPath.."addon/tactic_editor.lua") end
 koTactics.load(CONFIG.DataPath.."tactic_rules.txt")
 for pid,values in pairs(officerValues) do
 for key,value in pairs(values) do JY.Person[pid][key]=value end
