@@ -50,11 +50,13 @@ local v=War.Person[i]
 if v.id==PID and v.live and not v.hide and not v.enemy then me=v break end
 end
 if not me then return nil end
+local range=koTactics.setting(131,1,2)
+local morale=koTactics.setting(131,2,5)
 for i=1,War.PersonNum do
 local v=War.Person[i]
-if v.live and (not v.hide) and (not v.enemy) and v~=me and math.abs(v.x-me.x)+math.abs(v.y-me.y)<=2 then
+if v.live and (not v.hide) and (not v.enemy) and v~=me and math.abs(v.x-me.x)+math.abs(v.y-me.y)<=range then
 local p=JY.Person[v.id]
-if p[F_MORALE]<100 then p[F_MORALE]=math.min(p[F_MORALE]+5,100) end
+if p[F_MORALE]<100 then p[F_MORALE]=math.min(p[F_MORALE]+morale,100) end
 end
 end
 return nil

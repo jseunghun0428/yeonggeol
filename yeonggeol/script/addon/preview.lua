@@ -148,7 +148,7 @@ chain(h,s)
 elseif r.bl2>0 and (not wd.troubled) and not (enh and WarCheckSkill(scl,105)) and canhit() then
 local chance
 if enh and WarCheckSkill(eid,102) then chance=100
-elseif enh and (WarCheckSkill(eid,19) or itemskill(p2)==19) then chance=math.min(100,p2[koPK_WU2])
+elseif enh and (WarCheckSkill(eid,19) or itemskill(p2)==19) then chance=math.min(100,math.floor(p2[koPK_WU2]*koTactics.setting(19,1,100)/100))
 else chance=math.min(100,math.floor(p2[koPK_WU2]*100/150)) end
 -- the counter is rolled with the defender's stats after the hit (WarResetStatus recomputes them from
 -- the lowered morale in enhanced mode), so simulate that and put everything back
@@ -399,8 +399,9 @@ end
 end
 -- ko 3.6: 천부 마왕(123) heals x1.5 (not from a tool), as WarMagic does
 if (not item) and rawget(_G,"koDemon") and koDemon(scl) then
-if hp>=0 then hp=hp*1.5 end
-if sp>=0 then sp=sp*1.5 end
+local power=koTactics.setting(123,1,150)/100
+if hp>=0 then hp=hp*power end
+if sp>=0 then sp=sp*power end
 end
 -- ko 3.6: 이교 연계 (대교·소교 side by side) heals x1.3 (not from a tool), as WarMagic does
 if (not item) and rawget(_G,"koTwinOn") and koTwinOn(scl) then
@@ -455,10 +456,7 @@ local M=JY.Magic[mid]
 local kind=M[koPK_MTYPE]
 local p1=JY.Person[War.Person[scl].id]
 local r={kind=kind,name=M[koPK_MNAME],item=item,targets={},aid=between(kind,6,8)}
-if item then r.cost=0 else
-r.cost=M[koPK_MCOST]
-if CC.Enhancement and (p1[koPK_WEAPON]==12 or WarCheckSkill(scl,112)) then r.cost=math.modf(r.cost/2) end
-end
+r.cost=item and 0 or koStrategyMPCost(scl,M[koPK_MCOST],true)
 r.mp=p1[koPK_MP]
 local arr=WarGetAtkFW(War.Person[eid].x,War.Person[eid].y,M[koPK_MEFW])
 local ids={}
@@ -479,14 +477,11 @@ if between(kind,1,3) or kind>=9 then if t.ok then r.jy=r.jy+(t.jy or 0) end else
 end
 if p1[koPK_LV]>=99 then r.jy=0 end
 -- ko 3.2: 지낭(119) casts a single-target 화계·수계·낙석·독·낙뢰 twice (koWarMagicMenu_sub), the second time only if the target stands
-if CC.Enhancement and WarCheckSkill(scl,119) and (between(kind,1,3) or kind==9 or kind==10) and M[koPK_MEFW]==11 then
 local t=r.targets[1]
-r.twice=t and t.ok and not t.kill
-end
--- ko 3.6: 천부 마왕(123) casts every 책략 from the menu twice (koWarMagic2), the second time only if the target stands
-if (not item) and mid~=45 and rawget(_G,"koDemon") and koDemon(scl) then
-local t=r.targets[1]
-r.twice=t and t.ok~=false and not t.kill
+if t and t.ok~=false and not t.kill then
+local scholar=t.ok and koTacticScholarCasts(scl,mid) or 0
+local demon=(not item) and mid~=45 and koDemon(scl) and koTactics.setting(123,2,1) or 0
+r.casts=1+scholar+demon
 end
 return r
 end
@@ -514,7 +509,9 @@ L.seg(l,string.format("(%d%s)",#r.targets,koPL_UNIT),nil,8)
 else
 L.seg(l,koPL_ARROW,nil,8) L.seg(l,r.targets[1].name,team(wd),8)
 end
-if r.twice then L.seg(l,"("..koPL_TWICE..")",M_Yellow,8) end-- ko 3.2: 지낭
+if r.casts and r.casts>1 then
+L.seg(l,r.casts==2 and "("..koPL_TWICE..")" or "(x"..r.casts..")",M_Yellow,8)
+end
 if (not r.item) and rawget(_G,"koTwinOn") and koTwinOn(scl) then L.seg(l,"("..koPL_TWIN..")",M_Magenta,8) end-- ko 3.6: 이교 연계
 if multi then
 -- one row per unit: name column, then chance / damage (or recovery) columns

@@ -119,6 +119,12 @@ class TroopProject:
         for other, name in self.troops.items():
             if other != troop and troop in struct.unpack_from("<9h", self.row(other), 150):
                 found.append(f"병종 상성 · #{other} {name}")
+        tactics = self.base.path.with_name("tactic_rules.txt")
+        if tactics.exists():
+            for line in tactics.read_bytes().splitlines():
+                fields = line.split()
+                if len(fields) == 4 and fields[0] == b"L" and fields[2] == str(troop).encode("ascii"):
+                    found.append(f"공통 책략 습득 · #{int(fields[1])}")
         # Equipment and promotion manuals can require a particular class.
         for story, game in self.games.items():
             for i, start in enumerate(range(game.offsets[3], game.offsets[4], 274)):

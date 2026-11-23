@@ -123,7 +123,7 @@ class OfficerEditorTest(unittest.TestCase):
         usage = AppearanceUsage(ROOT, Game(ROOT, ""), "")
         base = usage.for_story("")
         slot = base.slot(80, "전투", 8)
-        self.assertTrue(any("영걸전 · #80 장료 · " in row and "중기병" in row
+        self.assertTrue(any("영걸전 · #80 장료 · " in row and base.game.troops[8] in row
                             for row in usage.users("전투", slot)))
         self.assertEqual({story for story, slug in CAMPAIGNS.items()
                           if usage.for_story(slug).slot(1, "얼굴") >= 0}, set(CAMPAIGNS))

@@ -2625,6 +2625,8 @@ end
 }
 setmetatable(JY.Skill[i],meta_t)
 end
+if not koTactics then koTactics=dofile(CONFIG.ScriptPath.."addon/tactic_editor.lua") end
+koTactics.load(CONFIG.DataPath.."tactic_rules.txt")
 for pid,values in pairs(officerValues) do
 for key,value in pairs(values) do JY.Person[pid][key]=value end
 end
@@ -3746,6 +3748,7 @@ while JY.Status==GAME_WMAP and War.Turn<=War.MaxTurn do
 --µÚX»ØºÏ X
 WarDrawStrBoxDelay(string.format('d%dp %s',War.Turn,WEA[War.Weather]),M_White)
 WarCheckStatus()
+if koTactics and JY.Status==GAME_WMAP then koTactics.turn(koTacticHasSkill) end
 koHook("turn_ready")--ko 5.0 (10-13): this turn's events are over, our phase is next (trial first strike)
 --ÎÒ¾ü²Ù×÷
 if JY.Status==GAME_WMAP then
@@ -4309,7 +4312,7 @@ WarAtk(scl,eid,1)
 WarResetStatus(eid)
 end
 elseif CC.Enhancement and (WarCheckSkill(eid,19) or JY.Item[JY.Person[eid]["ÎäÆ÷"]]["ÌØ¼¼"]==19) then--±¨¸´
-if math.random(100)<=JY.Person[War.Person[eid].id]["ÎäÁ¦2"] then
+if math.random(100)<=JY.Person[War.Person[eid].id]["ÎäÁ¦2"]*koTactics.setting(19,1,100)/100 then
 --ÕÉ°ËÉßÃ¬
 local smfj=0
 if CC.Enhancement and WarCheckSkill(eid,106) then
@@ -4353,7 +4356,8 @@ WarResetStatus(eid)
 end
 --»ìÂÒ¹¥»÷
 if CC.Enhancement and WarCheckSkill(scl,116) then
-if JY.Person[War.Person[eid].id]["±øÁ¦"]>0 then
+local chance=koTactics.setting(116,1,100)
+if JY.Person[War.Person[eid].id]["±øÁ¦"]>0 and chance>0 and (chance>=100 or math.random(100)<=chance) then
 War.Person[eid].troubled=true
 War.Person[eid].action=7
 WarDelay(2)
@@ -4369,7 +4373,9 @@ local e2=GetWarMap(koFJ[n][1],koFJ[n][2],2)
 if e2>0 and e2~=eid and War.Person[e2] and War.Person[e2].live and (not War.Person[e2].hide) and War.Person[e2].enemy~=War.Person[scl].enemy and JY.Person[War.Person[e2].id]["±øÁ¦"]>0 then koFL[#koFL+1]=e2 end
 end
 end
-for _,e2 in ipairs(koFL) do
+local maxExtra=koTactics.setting(130,1,60)
+for n,e2 in ipairs(koFL) do
+if n>maxExtra then break end
 if JY.Status~=GAME_WMAP or JY.Person[War.Person[scl].id]["±øÁ¦"]<=0 then break end
 if War.Person[e2].live and JY.Person[War.Person[e2].id]["±øÁ¦"]>0 then
 WarAtk(scl,e2)
@@ -4519,7 +4525,7 @@ WarAtk(scl,eid,1)
 WarResetStatus(eid)
 end
 elseif CC.Enhancement and (WarCheckSkill(eid,19) or JY.Item[JY.Person[eid]["ÎäÆ÷"]]["ÌØ¼¼"]==19) then--±¨¸´
-if math.random(100)<=JY.Person[War.Person[eid].id]["ÎäÁ¦2"] then
+if math.random(100)<=JY.Person[War.Person[eid].id]["ÎäÁ¦2"]*koTactics.setting(19,1,100)/100 then
 --ÕÉ°ËÉßÃ¬
 local smfj=0
 if CC.Enhancement and WarCheckSkill(eid,106) then
@@ -5093,6 +5099,13 @@ cur=hit
 end
 end
 
+function koStrategyMPCost(wid,cost,includeWeapon)
+if not CC.Enhancement then return cost end
+local discount=WarCheckSkill(wid,112) and koTactics.setting(112,1,50) or 0
+if includeWeapon and JY.Person[War.Person[wid].id]["ÎäÆ÷"]==12 then discount=math.max(discount,50) end
+return (math.modf(cost*(100-discount)/100))
+end
+
 function WarMagicMenu()
 local id=War.SelID
 local pid=War.Person[id].id
@@ -5128,16 +5141,12 @@ eid,eid2,eid3,eid4=ne[1],ne[2],ne[3],ne[4]
 end
 if WarHaveMagic(id,i) or eid>0 and WarHaveMagic(eid,i) or eid2>0 and WarHaveMagic(eid2,i) or eid3>0 and WarHaveMagic(eid3,i) or eid4>0 and WarHaveMagic(eid4,i) then
 n=n+1
-if CC.Enhancement and (JY.Person[pid]["ÎäÆ÷"]==12 or WarCheckSkill(id,112)) then--ÆßĞÇ½£ ²ßÂÔÖµÏûºÄ¼õ°ë
-m[i]={fillblank(JY.Magic[i]["Ãû³Æ"],8)..string.format("% 2d",math.modf(JY.Magic[i]["ÏûºÄ"]/2)),nil,1}
-else
-m[i]={fillblank(JY.Magic[i]["Ãû³Æ"],8)..string.format("% 2d",JY.Magic[i]["ÏûºÄ"]),nil,1}
-end
+m[i]={fillblank(JY.Magic[i]["Ãû³Æ"],8)..string.format("% 2d",koStrategyMPCost(id,JY.Magic[i]["ÏûºÄ"],true)),nil,1}
 else
 m[i]={"",nil,0}
 end
 end
-for i=1,JY.MagicNum-1 do if m[i][3]>0 then local c=JY.Magic[i]["ÏûºÄ"] if CC.Enhancement and (JY.Person[pid]["ÎäÆ÷"]==12 or WarCheckSkill(id,112)) then c=math.modf(c/2) end if JY.Person[pid]["²ßÂÔ"]<c then m[i].koColor=M_Red end end end--ko 4.0: short of MP = red (all modes; halving only in Enhancement like the real check)
+for i=1,JY.MagicNum-1 do if m[i][3]>0 then local c=koStrategyMPCost(id,JY.Magic[i]["ÏûºÄ"],true) if JY.Person[pid]["²ßÂÔ"]<c then m[i].koColor=M_Red end end end--ko 4.0: short of MP = red (all modes; halving only in Enhancement like the real check)
 menuy=math.min(War.OY+War.BoxDepth*(my-War.CY)+menu_off,CC.ScreenH-16-(16+8+20*math.min(n,8))-menu_off)
 local r
 if n==0 then
@@ -5150,10 +5159,7 @@ else
 r=koMagicTabMenu(m,n,pid,menux,menuy)--ko 3.6: strategy tabs
 end
 if r>0 then
-local clxh=JY.Magic[r]["ÏûºÄ"]
-if CC.Enhancement and (JY.Person[pid]["ÎäÆ÷"]==12 or WarCheckSkill(id,112)) then--ÆßĞÇ½£ ²ßÂÔÖµÏûºÄ¼õ°ë
-clxh=math.modf(clxh/2)
-end
+local clxh=koStrategyMPCost(id,JY.Magic[r]["ÏûºÄ"],true)
 if JY.Person[pid]["²ßÂÔ"]<clxh then
 PlayWavE(2)
 WarDrawStrBoxWaitKey("‚u‚v„Q^ ‚^„RWLM.",M_White)
@@ -5161,11 +5167,7 @@ else
 local MenuPicNum=JY.MenuPic.num
 JY.MenuPic.num=0
 if WarMagicMenu_sub(id,r,false) then
-if CC.Enhancement and (JY.Person[pid]["ÎäÆ÷"]==12 or WarCheckSkill(id,112)) then--ÆßĞÇ½£ ²ßÂÔÖµÏûºÄ¼õ°ë
-JY.Person[pid]["²ßÂÔ"]=JY.Person[pid]["²ßÂÔ"]-math.modf(JY.Magic[r]["ÏûºÄ"]/2)
-else
-JY.Person[pid]["²ßÂÔ"]=JY.Person[pid]["²ßÂÔ"]-JY.Magic[r]["ÏûºÄ"]
-end
+JY.Person[pid]["²ßÂÔ"]=JY.Person[pid]["²ßÂÔ"]-koStrategyMPCost(id,JY.Magic[r]["ÏûºÄ"],true)
 JY.MenuPic.num=MenuPicNum
 return 1
 end
@@ -5194,11 +5196,7 @@ if eid>0 and War.Person[eid].live and (not War.Person[eid].hide) then
 if WarMagicCheck(id,eid,r) then
 WarDrawStrBoxDelay(JY.Magic[r]["Ãû³Æ"].."ƒP „T‚v",M_White)
 koWarMagic2(id,eid,r,ItemFlag)
-if CC.Enhancement and WarCheckSkill(id,119) and JY.Magic[r]["Ğ§¹û·¶Î§"]==11 then
-if JY.Person[War.Person[eid].id]["±øÁ¦"]>0 then
-WarMagic(id,eid,r,ItemFlag)
-end
-end
+koTacticExtraStrategy(id,eid,r,ItemFlag,koTacticScholarCasts(id,r))
 return true
 else
 WarDrawStrBoxConfirm("ƒLG |‚O, ƒ|ƒQ, ƒwƒQ, ƒ{‚Cf*„OS „U„V „P q „OKLM.*(‚Cu xƒG^ „OƒmA ‚SƒZƒWƒv)",M_White)
@@ -5213,11 +5211,7 @@ if eid>0 and War.Person[eid].live and (not War.Person[eid].hide) then
 if WarMagicCheck(id,eid,r) then
 WarDrawStrBoxDelay(JY.Magic[r]["Ãû³Æ"].."ƒP „T‚v",M_White)
 koWarMagic2(id,eid,r,ItemFlag)
-if CC.Enhancement and WarCheckSkill(id,119) and JY.Magic[r]["Ğ§¹û·¶Î§"]==11 then
-if JY.Person[War.Person[eid].id]["±øÁ¦"]>0 then
-WarMagic(id,eid,r,ItemFlag)
-end
-end
+koTacticExtraStrategy(id,eid,r,ItemFlag,koTacticScholarCasts(id,r))
 return true
 else
 WarDrawStrBoxConfirm("ƒLG „W„X, ƒwƒQf*„OS „U„V „P q „OKLM.*(‚Cu xƒG^ „OƒmA ‚SƒZƒWƒv)",M_White)
@@ -5231,11 +5225,7 @@ if eid>0 and War.Person[eid].live and (not War.Person[eid].hide) then
 if WarMagicCheck(id,eid,r) then
 WarDrawStrBoxDelay(JY.Magic[r]["Ãû³Æ"].."ƒP „T‚v",M_White)
 koWarMagic2(id,eid,r,ItemFlag)
-if CC.Enhancement and WarCheckSkill(id,119) and JY.Magic[r]["Ğ§¹û·¶Î§"]==11 then
-if JY.Person[War.Person[eid].id]["±øÁ¦"]>0 then
-WarMagic(id,eid,r,ItemFlag)
-end
-end
+koTacticExtraStrategy(id,eid,r,ItemFlag,koTacticScholarCasts(id,r))
 return true
 else
 WarDrawStrBoxConfirm("ƒLG „[‚C, ‚UI‚Cf*„OS „U„V „P q „OKLM.*(‚Cu xƒG^ „OƒmA ‚SƒZƒWƒv)",M_White)
@@ -5291,11 +5281,7 @@ if eid>0 and War.Person[eid].live and (not War.Person[eid].hide) then
 if WarMagicCheck(id,eid,r) then
 WarDrawStrBoxDelay(JY.Magic[r]["Ãû³Æ"].."ƒP „T‚v",M_White)
 koWarMagic2(id,eid,r,ItemFlag)
-if CC.Enhancement and WarCheckSkill(id,119) and JY.Magic[r]["Ğ§¹û·¶Î§"]==11 then
-if JY.Person[War.Person[eid].id]["±øÁ¦"]>0 then
-WarMagic(id,eid,r,ItemFlag)
-end
-end
+koTacticExtraStrategy(id,eid,r,ItemFlag,koTacticScholarCasts(id,r))
 return true
 else
 WarDrawStrBoxConfirm("„a q ‚a‚b []„S „P q ‚aKLM.",M_White)
@@ -5310,11 +5296,7 @@ if eid>0 and War.Person[eid].live and (not War.Person[eid].hide) then
 if WarMagicCheck(id,eid,r) then
 WarDrawStrBoxDelay(JY.Magic[r]["Ãû³Æ"].."ƒP „T‚v",M_White)
 koWarMagic2(id,eid,r,ItemFlag)
-if CC.Enhancement and WarCheckSkill(id,119) and JY.Magic[r]["Ğ§¹û·¶Î§"]==11 then
-if JY.Person[War.Person[eid].id]["±øÁ¦"]>0 then
-WarMagic(id,eid,r,ItemFlag)
-end
-end
+koTacticExtraStrategy(id,eid,r,ItemFlag,koTacticScholarCasts(id,r))
 return true
 else
 WarDrawStrBoxConfirm("‚Lƒb ƒSf‚b „Y„b‚h „P q ‚aKLM.",M_White)
@@ -5367,10 +5349,10 @@ a=1
 b=2
 end
 if WarCheckSkill(wid,17) then--ÉñËã
-a=a*2
+a=a*koTactics.setting(17,1,200)/100
 end
 if WarCheckSkill(eid,18) then--Ê¶ÆÆ
-b=b*2
+b=b*koTactics.setting(18,1,200)/100
 end
 end
 if JY.Magic[mid]["ÀàĞÍ"]==4 then
@@ -5396,6 +5378,12 @@ end
 end
 
 function WarMagic(wid,eid,mid,ItemFlag)
+if koTactics then
+if koTactics.deleted.M[mid] then return end
+if koTactics.strategy(wid,eid,mid,ItemFlag,koMagicKill,function(a,b)
+koTactics.skill(3,a,b,koTacticHasSkill)
+end) then return end
+end
 War.ControlStatus="actionMenu"
 ItemFlag=ItemFlag or false
 local mx=War.Person[eid].x
@@ -5450,7 +5438,7 @@ for i=1,atkarray.num do
 					else
 						sq_hurt=JY.Magic[mid]["Ğ§¹û"]+JY.Person[id1]["µÈ¼¶"]/10
 					end
-					sq_hurt=math.modf(sq_hurt*(1+math.random()/10)*((koDemon(wid) and not ItemFlag) and 1.5 or 1)*((koTwinOn(wid) and not ItemFlag) and 1.3 or 1))
+					sq_hurt=math.modf(sq_hurt*(1+math.random()/10)*((koDemon(wid) and not ItemFlag) and koTactics.setting(123,1,150)/100 or 1)*((koTwinOn(wid) and not ItemFlag) and 1.3 or 1))
 					sq_hurt=limitX(sq_hurt,0,War.Person[id].sq_limited-JY.Person[id2]["Ê¿Æø"])
 					hurt=-1
 					if atkarray.num==1 then
@@ -5471,7 +5459,7 @@ for i=1,atkarray.num do
 							end
 						end
 					end
-					hurt=math.modf(hurt*(1+math.random()/10)*((koDemon(wid) and not ItemFlag) and 1.5 or 1)*((koTwinOn(wid) and not ItemFlag) and 1.3 or 1))
+					hurt=math.modf(hurt*(1+math.random()/10)*((koDemon(wid) and not ItemFlag) and koTactics.setting(123,1,150)/100 or 1)*((koTwinOn(wid) and not ItemFlag) and 1.3 or 1))
 					hurt=limitX(hurt,0,JY.Person[id2]["×î´ó±øÁ¦"]-JY.Person[id2]["±øÁ¦"])
 					do local koH=rawget(_G,"koHealCut") if koH then hurt=koH(hurt,id) end end--ko 5.0 (10-13): trial ã€Œì•„êµ° íšŒë³µã€
 					sq_hurt=-1
@@ -5493,10 +5481,10 @@ for i=1,atkarray.num do
 							end
 						end
 					end
-					hurt=math.modf(hurt*(1+math.random()/10)*((koDemon(wid) and not ItemFlag) and 1.5 or 1)*((koTwinOn(wid) and not ItemFlag) and 1.3 or 1))
+					hurt=math.modf(hurt*(1+math.random()/10)*((koDemon(wid) and not ItemFlag) and koTactics.setting(123,1,150)/100 or 1)*((koTwinOn(wid) and not ItemFlag) and 1.3 or 1))
 					hurt=limitX(hurt,0,JY.Person[id2]["×î´ó±øÁ¦"]-JY.Person[id2]["±øÁ¦"])
 					do local koH=rawget(_G,"koHealCut") if koH then hurt=koH(hurt,id) end end--ko 5.0 (10-13): trial ã€Œì•„êµ° íšŒë³µã€
-					sq_hurt=math.modf(sq_hurt*(1+math.random()/10)*((koDemon(wid) and not ItemFlag) and 1.5 or 1)*((koTwinOn(wid) and not ItemFlag) and 1.3 or 1))
+					sq_hurt=math.modf(sq_hurt*(1+math.random()/10)*((koDemon(wid) and not ItemFlag) and koTactics.setting(123,1,150)/100 or 1)*((koTwinOn(wid) and not ItemFlag) and 1.3 or 1))
 					sq_hurt=limitX(sq_hurt,0,War.Person[id].sq_limited-JY.Person[id2]["Ê¿Æø"])
 					if atkarray.num==1 then
 						WarDrawStrBoxDelay(JY.Person[id2]["ĞÕÃû"].."ƒP ‚~ƒ}{ ‚rƒG„Q^ ƒi„gM.",M_White)
@@ -6003,6 +5991,7 @@ end
 		end
 	end
 end
+if koTactics and JY.Status==GAME_WMAP then koTactics.skill(3,wid,eid,koTacticHasSkill) end
 WarResetStatus(wid)
 end
 
@@ -6083,6 +6072,7 @@ koPoisonMag={[41]={turns=3,rate=75},[42]={turns=2,rate=50}}--ko 3.5: poison magi
 
 --²ßÂÔÉËº¦
 function WarMagicHurt(wid,eid,mid,ItemFlag)
+if koTactics and koTactics.rules.M[mid] then return koTactics.strategyDamage(wid,eid,mid),0,0,0 end
 ItemFlag=ItemFlag or false
 local id1=War.Person[wid].id
 local id2=War.Person[eid].id
@@ -6141,10 +6131,10 @@ if JY.Magic[mid]["ÀàĞÍ"]==2 and (WarCheckSkill(wid,11) or JY.Item[p1["ÎäÆ÷"]]["Ì
 		hurt=hurt*(100+JY.Skill[11]["²ÎÊı1"])/100
 	end
 end
-if JY.Magic[mid]["ÀàĞÍ"]==3 and (WarCheckSkill(wid,14) or JY.Item[p1["ÎäÆ÷"]]["ÌØ¼¼"]==14) then--ÂäÊ¯	
+if JY.Magic[mid]["ÀàĞÍ"]==3 and (WarCheckSkill(wid,14) or JY.Item[p1["ÎäÆ÷"]]["ÌØ¼¼"]==14) then--ÂäÊ¯
 		hurt=hurt*(100+JY.Skill[14]["²ÎÊı1"])/100
 end
-if JY.Magic[mid]["ÀàĞÍ"]==3 and (WarCheckSkill(wid,21) or JY.Item[p1["ÎäÆ÷"]]["ÌØ¼¼"]==21) then --·ü±ø	
+if JY.Magic[mid]["ÀàĞÍ"]==3 and (WarCheckSkill(wid,21) or JY.Item[p1["ÎäÆ÷"]]["ÌØ¼¼"]==21) then --·ü±ø
 		hurt=hurt*(100+JY.Skill[21]["²ÎÊı1"])/100
 end
 if (between(JY.Magic[mid]["ÀàĞÍ"],1,3) or between(JY.Magic[mid]["ÀàĞÍ"],9,10)) and WarCheckSkill(wid,39) then--¶¾¼Æ
@@ -6158,7 +6148,7 @@ if (between(JY.Magic[mid]["ÀàĞÍ"],1,3) or between(JY.Magic[mid]["ÀàĞÍ"],9,10)) a
 	end
 end
 if (between(JY.Magic[mid]["ÀàĞÍ"],1,3) or between(JY.Magic[mid]["ÀàĞÍ"],9,10)) and koDemon(wid) and not ItemFlag then--ko 3.6: talent 123 (not from a tool)
-	hurt=hurt*1.5
+	hurt=hurt*koTactics.setting(123,1,150)/100
 end
 if JY.Magic[mid]["ÀàĞÍ"]==1 and WarCheckSkill(eid,13) then--Ãğ»ğ
 hurt=hurt*(100-JY.Skill[13]["²ÎÊı1"])/100
@@ -6766,8 +6756,9 @@ else
 	hurt=hurt*(100-T[dx])/100
 end
 if koStratClass(eid) then hurt=hurt*0.85 end--ko 5.0: strategists take 15% less physical damage
-if flag==1 and not (CC.Enhancement and WarCheckSkill(pid,107)) then--counter? 107(hoegyeok): no damage halving (ko fix)
-hurt=hurt/2
+if flag==1 then--counter damage
+local counterPower=CC.Enhancement and WarCheckSkill(pid,107) and koTactics.setting(107,1,100) or 50
+hurt=hurt*counterPower/100
 elseif flag==2 or flag==3 then--ÂÒÉä/ÂÒÎè ÉËº¦Í³Ò»ÉèÖÃÎªÕı³£ÉËº¦µÄ40%
 hurt=hurt*0.4
 end
@@ -6775,24 +6766,18 @@ hurt=math.modf(hurt)
 if rawget(_G,"koVaryHurt") then hurt=koVaryHurt(hurt) end--ko 5.0: damage spread (dmgvary)
 if CC.Enhancement then
 if WarCheckSkill(eid,43) then--ÀÇ¹Ë
-if hurt>p2["×î´ó±øÁ¦"]/5 then
-hurt=p2["×î´ó±øÁ¦"]/5
-end
+hurt=math.min(hurt,p2["×î´ó±øÁ¦"]*koTactics.setting(43,1,20)/100)
 end
 end
 if CC.Enhancement and WarCheckSkill(eid,104) then--¹ØÓğ ÇàÁúÙÈÔÂµ¶ ±»¹¥»÷Ê±±Ø¶¨¸ñµ²
-if hurt>p2["×î´ó±øÁ¦"]/5 then
-hurt=p2["×î´ó±øÁ¦"]/5
-end
+hurt=math.min(hurt,p2["×î´ó±øÁ¦"]*koTactics.setting(104,1,20)/100)
 end
 local koCrit=false--ko 3.2: 115 always shows as a critical hit
 if CC.Enhancement and (p1["ÎäÆ÷"]==60 or WarCheckSkill(pid,115)) then--°ÔÍõÖ®½£ ¹¥»÷Ê±±Ø¶¨±©»÷
 if WarCheckSkill(eid,23) or WarCheckSkill(eid,43) or WarCheckSkill(eid,47) or WarCheckSkill(eid,104) then--ÓµÓĞ ÌÙ¼× ÀÇ¹Ë Çã¹ú ÌØ¼¼Ê±ÃâÒßÌØĞ§
 WarDrawStrBoxDelay('„Q‚X…@ y{^ _‚la‚C ‚kƒtM',M_White)
 else
-if hurt<p2["±øÁ¦"]*0.4 then
-hurt=p2["±øÁ¦"]*0.4
-end
+hurt=math.max(hurt,p2["±øÁ¦"]*koTactics.setting(115,1,40)/100)
 koCrit=true
 end
 end
@@ -6825,8 +6810,13 @@ else
 sq_hurt=0
 end
 end
-if CC.Enhancement and (p1["ÎäÆ÷"]==14 or WarCheckSkill(pid,113)) then--Èı¼âµ¶ ¹¥»÷Ê±¶îÍâ¼õÉÙµĞ·½Ê¿Æø
-sq_hurt=sq_hurt+10
+if CC.Enhancement then
+local moraleBonus=p1["ÎäÆ÷"]==14 and 10 or 0
+if WarCheckSkill(pid,113) then
+local intimidation=koTactics and koTactics.skillValue(JY.Skill[113]["²ÎÊı1"],10) or 10
+moraleBonus=math.max(moraleBonus,intimidation)
+end
+sq_hurt=sq_hurt+moraleBonus
 end
 sq_hurt=limitX(sq_hurt,0,p2["Ê¿Æø"])
 --¾­ÑéÖµ»ñµÃ
@@ -7006,7 +6996,10 @@ ReFresh(CC.OpearteSpeed*4/(CC.koAnim or 1))
 WarDelay(koAnimD(4))
 end--ko 3.0 fight scene
 WarGetTrouble(eid)
-if CC.Enhancement and hurt>0 and WarCheckSkill(pid,120) then War.Person[eid].poison=3 end
+if CC.Enhancement and hurt>0 and WarCheckSkill(pid,120) then
+local turns=koTactics.setting(120,1,3)
+if turns>0 then War.Person[eid].poison=turns end
+end
 --¹¥ĞÄ ÏÔÊ¾
 if CC.Enhancement then
 if WarCheckSkill(pid,33) or (War.Person[pid].id==3 and koStoryEv()>488 and not GetFlag(38)) then--¹¥ĞÄ öÃIÖ®Õ½ÈôÅÓÍ³Î´ËÀ£¬ÕÅ·É±Ø´¥·¢¸ÃÌØĞ§
@@ -7475,6 +7468,10 @@ War.Person[pid].frame=1-War.Person[pid].frame
 WarDelay(n*2)
 end
 WarDelay(n*2)
+end
+if koTactics and JY.Status==GAME_WMAP then
+koTactics.skill(1,pid,eid,koTacticHasSkill)
+koTactics.skill(2,eid,pid,koTacticHasSkill)
 end
 WarResetStatus(pid)
 WarResetStatus(eid)
@@ -9410,12 +9407,26 @@ function koDemon(wid)
 local v=War.Person[wid]
 return CC.Enhancement and v~=nil and JY.Person[v.id]["Ìì¸³"]==123
 end
+function koTacticScholarCasts(wid,mid)
+if not CC.Enhancement or not WarCheckSkill(wid,119) then return 0 end
+local magic=JY.Magic[mid]
+local kind=magic["ÀàĞÍ"]
+if (between(kind,1,3) or kind==9 or kind==10) and magic["Ğ§¹û·¶Î§"]==11 then
+return koTactics.setting(119,1,1)
+end
+return 0
+end
+function koTacticExtraStrategy(wid,eid,mid,item,count)
+for _=1,count do
+local e=War.Person[eid]
+if JY.Status~=GAME_WMAP or not e or not e.live or e.hide or JY.Person[e.id]["±øÁ¦"]<=0 then break end
+WarMagic(wid,eid,mid,item)
+end
+end
 function koWarMagic2(id,eid,r,ItemFlag)
 WarMagic(id,eid,r,ItemFlag)
-if ItemFlag or r==45 or not koDemon(id) then return end
-local e=War.Person[eid]
-if e and e.live and (not e.hide) then
-WarMagic(id,eid,r,ItemFlag)
+if not ItemFlag and r~=45 and koDemon(id) then
+koTacticExtraStrategy(id,eid,r,ItemFlag,koTactics.setting(123,2,1))
 end
 end
 --ko 3.6: tavern generals with their own records: {person, story gate (shown once JY.EventID passes it), cycle record}
@@ -10243,17 +10254,8 @@ did=eid
 BoxBack()
 WarDrawStrBoxDelay(string.format("%sG(^) %sƒP „T‚vS dM.",JY.Person[id1]["ĞÕÃû"],JY.Magic[mid]["Ãû³Æ"]),M_White)
 koWarMagic2(id,eid,mid)--ko 3.6 QA: talent 123 casts twice on delegated turns too
-if CC.Enhancement and WarCheckSkill(id,119) then
-local koK=JY.Magic[mid]["ÀàĞÍ"]--ko 3.2: 119 for the AI as for the player: kinds 1,2,3,9,10, and only while the target stands
-if (between(koK,1,3) or koK==9 or koK==10) and JY.Magic[mid]["Ğ§¹û·¶Î§"]==11 and JY.Person[War.Person[eid].id]["±øÁ¦"]>0 then
-WarMagic(id,eid,mid)
-end
-end
-if CC.Enhancement and WarCheckSkill(id,112) then--ÆßĞÇ½£ ²ßÂÔÖµÏûºÄ¼õ°ë
-JY.Person[id1]["²ßÂÔ"]=JY.Person[id1]["²ßÂÔ"]-math.modf(JY.Magic[mid]["ÏûºÄ"]/2)
-else
-JY.Person[id1]["²ßÂÔ"]=JY.Person[id1]["²ßÂÔ"]-JY.Magic[mid]["ÏûºÄ"]
-end
+koTacticExtraStrategy(id,eid,mid,false,koTacticScholarCasts(id,mid))
+JY.Person[id1]["²ßÂÔ"]=JY.Person[id1]["²ßÂÔ"]-koStrategyMPCost(id,JY.Magic[mid]["ÏûºÄ"],false)
 JY.Person[id1]["²ßÂÔ"]=limitX(JY.Person[id1]["²ßÂÔ"],0,JY.Person[id1]["×î´ó²ßÂÔ"])
 else
 if eid>0 then
@@ -10307,7 +10309,7 @@ WarAtk(id,eid,1)
 WarResetStatus(eid)
 end
 elseif CC.Enhancement and (WarCheckSkill(eid,19) or JY.Item[JY.Person[eid]["ÎäÆ÷"]]["ÌØ¼¼"]==19) then--±¨¸´
-if math.random(100)<=JY.Person[War.Person[eid].id]["ÎäÁ¦2"] then
+if math.random(100)<=JY.Person[War.Person[eid].id]["ÎäÁ¦2"]*koTactics.setting(19,1,100)/100 then
 --ÕÉ°ËÉßÃ¬
 local smfj=0
 if CC.Enhancement and WarCheckSkill(eid,106) then
@@ -10350,7 +10352,8 @@ WarResetStatus(eid)
 end
 --»ìÂÒ¹¥»÷
 if CC.Enhancement and WarCheckSkill(id,116) then
-if JY.Person[War.Person[eid].id]["±øÁ¦"]>0 then
+local chance=koTactics.setting(116,1,100)
+if JY.Person[War.Person[eid].id]["±øÁ¦"]>0 and chance>0 and (chance>=100 or math.random(100)<=chance) then
 War.Person[eid].troubled=true
 War.Person[eid].action=7
 WarDelay(2)
@@ -10366,7 +10369,9 @@ local e2=GetWarMap(koFJ[n][1],koFJ[n][2],2)
 if e2>0 and e2~=eid and War.Person[e2] and War.Person[e2].live and (not War.Person[e2].hide) and War.Person[e2].enemy~=War.Person[id].enemy and JY.Person[War.Person[e2].id]["±øÁ¦"]>0 then koFL[#koFL+1]=e2 end
 end
 end
-for _,e2 in ipairs(koFL) do
+local maxExtra=koTactics.setting(130,1,60)
+for n,e2 in ipairs(koFL) do
+if n>maxExtra then break end
 if JY.Status~=GAME_WMAP or JY.Person[War.Person[id].id]["±øÁ¦"]<=0 then break end
 if War.Person[e2].live and JY.Person[War.Person[e2].id]["±øÁ¦"]>0 then
 WarAtk(id,e2)
@@ -10515,7 +10520,7 @@ WarAtk(id,eid,1)
 WarResetStatus(eid)
 end
 elseif CC.Enhancement and (WarCheckSkill(eid,19) or JY.Item[JY.Person[eid]["ÎäÆ÷"]]["ÌØ¼¼"]==19) then--±¨¸´
-if math.random(100)<=JY.Person[War.Person[eid].id]["ÎäÁ¦2"] then
+if math.random(100)<=JY.Person[War.Person[eid].id]["ÎäÁ¦2"]*koTactics.setting(19,1,100)/100 then
 --ÕÉ°ËÉßÃ¬
 local smfj=0
 if CC.Enhancement and WarCheckSkill(eid,106) then
@@ -10674,6 +10679,10 @@ return dv
 end
 
 function HaveMagic(pid,mid)
+if koTactics then
+if koTactics.deleted.M[mid] then return false end
+if koTactics.learns(pid,mid) then return true end
+end
 local bz=JY.Person[pid]["±øÖÖ"]
 local lv=JY.Person[pid]["µÈ¼¶"]
 if CC.Enhancement and bz==32 and mid>=1 and mid<=46 and mid~=45 then return true end--ko 3.6: the Demon King class knows every strategy
@@ -10795,7 +10804,7 @@ SetWarMap(ox,oy,2,0)
 SetWarMap(x,y,2,pid)
 for mid=1,JY.MagicNum-1 do
 if WarHaveMagic(pid,mid) then
-if JY.Person[id1]["²ßÂÔ"]>=JY.Magic[mid]["ÏûºÄ"] then--mp enough?
+if JY.Person[id1]["²ßÂÔ"]>=koStrategyMPCost(pid,JY.Magic[mid]["ÏûºÄ"],false) then--mp enough?
 if true then--dx?
 local kind=JY.Magic[mid]["ÀàĞÍ"]
 local fw=JY.Magic[mid]["Ê©Õ¹·¶Î§"]
@@ -10842,13 +10851,15 @@ dv=0
 local v=0
 for mid=1,JY.MagicNum-1 do
 if WarHaveMagic(pid,mid) then
-if JY.Person[id1]["²ßÂÔ"]>=JY.Magic[mid]["ÏûºÄ"] then--mp enough?
+if JY.Person[id1]["²ßÂÔ"]>=koStrategyMPCost(pid,JY.Magic[mid]["ÏûºÄ"],false) then--mp enough?
 if oid>0 and War.Person[oid].live and (not War.Person[oid].hide) then
 if WarMagicCheck(pid,oid,mid) then--µØĞÎ£¬ÌìÆø
 local kind=JY.Magic[mid]["ÀàĞÍ"]
 local power=JY.Magic[mid]["Ğ§¹û"]
 local fw=JY.Magic[mid]["Ğ§¹û·¶Î§"]
-if between(kind,1,3) or between(kind,9,10) then--»ğË®Ê¯/¶¾À×
+if koTactics and koTactics.rules.M[mid] then
+v=koTactics.strategyScore(pid,oid,mid)
+elseif between(kind,1,3) or between(kind,9,10) then--»ğË®Ê¯/¶¾À×
  v=0
 if War.Person[pid].enemy~=War.Person[oid].enemy then
 local array=WarGetAtkFW(x,y,fw)
@@ -11533,8 +11544,8 @@ local hp_times=0
 local sp_times=0
 local hp_item_flag=false
 local sp_item_flag=false
-local hp_skill_flag=false
-local sp_skill_flag=false
+local hp_skill_pct=0
+local sp_skill_pct=0
 for index=1,8 do
 local tid=JY.Person[v.id]["µÀ¾ß"..index]
 if JY.Item[tid]["ÀàĞÍ"]==7 then
@@ -11550,14 +11561,14 @@ end
 end
 if CC.Enhancement then
 if WarCheckSkill(i,22) then--ÖÎÁÆ
-hp_skill_flag=(hp_skill_flag or 0)+1
+hp_skill_pct=hp_skill_pct+koTactics.skillValue(JY.Skill[22]["²ÎÊı1"],100)
 end
 if WarCheckSkill(i,2) or JY.Item[JY.Person[War.Person[i].id]["ÎäÆ÷"]]["ÌØ¼¼"]==2 then--ÊÕÊ°
-	hp_skill_flag=(hp_skill_flag or 0)+1
-	sp_skill_flag=(sp_skill_flag or 0)+1
+	hp_skill_pct=hp_skill_pct+koTactics.skillValue(JY.Skill[2]["²ÎÊı1"],100)
+	sp_skill_pct=sp_skill_pct+koTactics.skillValue(JY.Skill[2]["²ÎÊı2"],100)
 end
 if WarCheckSkill(i,20) or JY.Item[JY.Person[War.Person[i].id]["ÎäÆ÷"]]["ÌØ¼¼"]==20 then--³Á×Å
-sp_skill_flag=(sp_skill_flag or 0)+1
+sp_skill_pct=sp_skill_pct+koTactics.skillValue(JY.Skill[20]["²ÎÊı1"],100)
 end
 end
 local dx=GetWarMap(v.x,v.y,1)
@@ -11574,13 +11585,7 @@ end
 if sp_item_flag then
 sp_times=sp_times+1
 end
-if hp_skill_flag then
-hp_times=hp_times+hp_skill_flag--ko 5.0: one per skill
-end
-if sp_skill_flag then
-sp_times=sp_times+sp_skill_flag--ko 5.0: one per skill
-end
-if hp_times>0 then
+if hp_times>0 or hp_skill_pct>0 then
 --±øÁ¦µÄ×Ô¶¯»Ö¸´Á¿£½150£«£¨0¡«10Ö®¼äµÄËæ»úÊı£©¡Á10
 hp=150+(math.random(11)-1)*10
 --ĞŞ¸ÄÎª×ÔÉí±øÁ¦µÄ10%-20%
@@ -11588,17 +11593,17 @@ if CC.Enhancement then
 hp=math.max(150+(math.random(11)-1)*10,math.modf(JY.Person[v.id]["×î´ó±øÁ¦"]/1000*(math.modf(JY.Person[v.id]["Í³ÂÊ2"]/10)+1+math.random(10)))*10)
 end
 --µ±±øÁ¦»Ö¸´ºóÀë×î´ó±øÁ¦µÄ²î¾à²»×ã10Ê±£¬ÏµÍ³½«×Ô¶¯²¹Âú¸Ã²î¾à
-hp=hp*hp_times
+hp=math.floor(hp*(hp_times+hp_skill_pct/100))
 if JY.Person[v.id]["×î´ó±øÁ¦"]-JY.Person[v.id]["±øÁ¦"]-hp<9 then
 hp=JY.Person[v.id]["×î´ó±øÁ¦"]-JY.Person[v.id]["±øÁ¦"]
 end
 end
 do local koH=rawget(_G,"koHealCut") if koH and hp>0 then hp=koH(hp,i) end end--ko 5.0 (10-13): trial ã€Œì•„êµ° íšŒë³µã€
-if sp_times>0 then
+if sp_times>0 or sp_skill_pct>0 then
 --Ê¿ÆøµÄ×Ô¶¯»Ö¸´Á¿£½Í³ÓùÁ¦¡Â10£«£¨1¡«5Ö®¼äµÄËæ»úÊı£©
 sp=math.modf(JY.Person[v.id]["Í³ÂÊ2"]/10)+math.random(5)
 --Óë±øÁ¦»Ö¸´Ïà·Â£¬Ê¿Æø»Ö¸´ºó³¬¹ı90Ê±£¬ÏµÍ³½«×Ô¶¯²»ÂúÊ¿Æø
-sp=sp*sp_times
+sp=math.floor(sp*(sp_times+sp_skill_pct/100))
 if v.sq_limited-JY.Person[v.id]["Ê¿Æø"]-sp<9 then
 sp=v.sq_limited-JY.Person[v.id]["Ê¿Æø"]
 end
@@ -19697,14 +19702,14 @@ end
 return false
 end
 
+koTacticHasSkill=koHasSkill
 function WarCheckSkill(wid,skillid)
+if koTactics and koTactics.deleted.S[skillid] then return false end
 return koHasSkill(War.Person[wid].id,skillid)
 end
 
 function CheckSkill(pid,skillid)
-if pid<=0 then
-return false
-end
+if pid<=0 or (koTactics and koTactics.deleted.S[skillid]) then return false end
 return koHasSkill(pid,skillid)
 end
 

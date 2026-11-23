@@ -8,7 +8,6 @@
 --  · 천부와 장비 기록은 세이브에 들어 있어, 불러올 때 옛 값이면 새 값으로 맞춤(사용자가 바꾼 것은 그대로).
 -- Build (game folder): perl "../\129\126\130\064\130\066\130\068\130\069 \130\071\130\072\130\070 5.0 \134\075\129\095\132\111/\134\075\129\095\132\111/\129\068\130\119/free_hz.pl" < "../\129\126\130\064\130\066\130\068\130\069 \130\071\130\072\130\070 5.0 \134\075\129\095\132\111/\134\075\129\095\132\111/addon/tank_src.lua" > script/addon/tank.lua
 local GUARD,TAUNT=51,52
-local GUARD_RANGE,TAUNT_RANGE,GUARD_MINHP,TAUNT_BONUS=2,3,0.3,40   -- (10-11 사용자: 한 턴 횟수 제한 없음, 병력 30% 가 제한)
 local P_NAME,P_BL,P_MAXBL="\208\213\195\251","\177\248\193\166","\215\238\180\243\177\248\193\166"-- 姓名 兵力 最大兵力
 local P_TF,P_FACE="\204\236\184\179","\205\183\207\241\180\250\186\197"-- 天赋 头像代号
 local I_SKILL,I_DESC="\204\216\188\188","\203\181\195\247"-- 特技 说明 (of an item)
@@ -18,7 +17,7 @@ local function sameSide(a,b) return a.enemy==b.enemy end
 local function usable(i,u)
 	if not (u and u.live and not u.hide and not u.troubled) then return false end
 	local p=JY.Person[u.id]
-	if (p[P_BL] or 0)<(p[P_MAXBL] or 1)*GUARD_MINHP then return false end
+	if (p[P_BL] or 0)<(p[P_MAXBL] or 1)*koTactics.setting(GUARD,2,30)/100 then return false end
 	return WarCheckSkill(i,GUARD)
 end
 -- who would take a physical attack of war unit atk on war unit eid (nil = nobody)
@@ -28,8 +27,9 @@ function koGuardFind(atk,eid)
 	local a=War.Person[atk]
 	if not (t and a) or sameSide(a,t) then return nil end
 	local best,bd,bb=nil,99,-1
+	local range=koTactics.setting(GUARD,1,2)
 	for i,u in pairs(War.Person) do
-		if i~=eid and i~=atk and sameSide(u,t) and dist(u,t)<=GUARD_RANGE and usable(i,u) then
+		if i~=eid and i~=atk and sameSide(u,t) and dist(u,t)<=range and usable(i,u) then
 			local d,b=dist(u,t),JY.Person[u.id][P_BL]
 			if d<bd or (d==bd and b>bb) then best,bd,bb=i,d,b end
 		end
@@ -59,7 +59,9 @@ do
 			t=g
 		end
 		local tu,au=War.Person[t],War.Person[pid]
-		if v>0 and tu and au and dist(tu,au)<=TAUNT_RANGE and WarCheckSkill(t,TAUNT) then v=v+TAUNT_BONUS end
+		if v>0 and tu and au and dist(tu,au)<=koTactics.setting(TAUNT,1,3) and WarCheckSkill(t,TAUNT) then
+			v=v+koTactics.setting(TAUNT,2,40)
+		end
 		return v
 	end
 end
