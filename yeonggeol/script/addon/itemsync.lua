@@ -39,7 +39,9 @@ local v=nv(i,k)
 if it[k]~=v then it[k]=v changed=changed+1 end
 end
 local sk=nv(i,K_SK)
-if (t==4 or t==7 or ((t==5 or t==6) and sk~=0)) and it[K_SK]~=sk then it[K_SK]=sk changed=changed+1 end
+-- The treasure editor already migrated edited defaults and kept legacy engravings.
+if not (CC.koTreasureRegular and CC.koTreasureRegular[i]) and
+   (t==4 or t==7 or ((t==5 or t==6) and sk~=0)) and it[K_SK]~=sk then it[K_SK]=sk changed=changed+1 end
 end
 end
 -- 군웅록 11-14 (학우선): 793 학우선(옛 세이브엔 빈 칸) · 776 학우선★(옛 팔진서★, 병서 → 책략무기)은 숫자까지 통째로 newgame 값

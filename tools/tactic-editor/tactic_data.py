@@ -6,12 +6,14 @@ import json
 import re
 import struct
 import sys
+from functools import cached_property
 from pathlib import Path
 
 from PIL import Image
 
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(TOOLS / "troop-editor"), str(TOOLS / "officer-editor")]
+from attack_range import load_attack_ranges
 from awakening import Awakening
 from data import Archive, SKILLS, replace_files
 from troop_data import TroopProject
@@ -29,8 +31,12 @@ CONDITIONS = ("항상", "자신의 병력 % 이하", "대상의 병력 % 이하"
 EFFECTS = ("병력 회복", "최대 병력 비례 회복 (%)", "병력 피해", "MP 회복", "MP 감소",
            "사기 회복", "사기 감소", "혼란 부여", "혼란 해제", "중독 부여 (턴)", "중독 해제")
 TARGETS = ("자신", "대상")
-STRATEGY_KINDS = ("화계", "수계", "석계", "혼란", "사기 감소", "사기 회복",
+STRATEGY_KINDS = ("화계", "수계", "지계", "혼란", "사기 감소", "사기 회복",
                   "병력 회복", "병력·사기 회복", "독계", "뇌계", "특수")
+
+# The five base strategies of each family use native skill parameters 2–6.
+ELEMENT_SKILL_STRATEGIES = {12: range(1, 6), 11: range(6, 11), 14: range(11, 16)}
+POISON_STRATEGIES = (41, 42, 47, 48, 49)  # parameters 2–6 of skill 39
 
 # Positional meanings read by the native skill formulas in jymain.lua.
 SKILL_PARAMETERS = {
@@ -46,14 +52,14 @@ SKILL_PARAMETERS = {
     11: ("수계 피해 증가 (%)",),
     12: ("화계 피해 증가 (%)",),
     13: ("받는 화계 피해 감소 (%)",),
-    14: ("석계 피해 증가 (%)",),
-    15: ("석계 혼란 확률 (%)",),
+    14: ("지계 피해 증가 (%)",),
+    15: ("지계 혼란 확률 (%)",),
     16: ("받는 공격 책략 피해 감소 (%)",),
     17: ("책략 성공 계산 지력 배율 (%)",),
     18: ("상대 책략 성공 계산 저항 배율 (%)",),
     19: ("반격 확률에 쓰는 무력 배율 (%)",),
     20: ("사기 회복 배율 (%)",),
-    21: ("석계 피해·매복 공격 보정 (%)",),
+    21: ("지계 피해·매복 공격 보정 (%)",),
     22: ("병력 회복 배율 (%)",),
     23: ("받는 물리 피해 감소 (%)", "받는 화계 피해 증가 (%)"),
     24: ("레벨당 원거리 병종 공격·방어 증가",),
@@ -70,7 +76,8 @@ SKILL_PARAMETERS = {
     36: ("방어 보정 (%)",),
     37: ("적중한 공격 책략 피해 감소 (%)",),
     38: ("", "팔진 책략 습득 레벨"),
-    39: ("공격 책략 피해 증가 (%)", "독연 습득 레벨", "독무 습득 레벨"),
+    39: ("독계 피해 증가 (%)", "독연 습득 레벨", "독무 습득 레벨", "독룡 습득 레벨",
+         "혈독 습득 레벨", "독천 습득 레벨"),
     40: ("낙뢰 습득 레벨", "대낙뢰 습득 레벨"),
     41: ("병력 회복 책략 보정 (%)",),
     43: ("한 번에 받는 피해 상한 (최대 병력 %)",),
@@ -126,6 +133,10 @@ def skill_description(number, description, values):
         return re.sub(r"\(레벨당 [+-]?\d+\)", f"(레벨당 {values[0]:+d})", description)
     if number == 32:
         return re.sub(r"\([+-]?\d+%\)", f"({values[0]:+d}%)", description)
+    if number == 39:
+        return (f"독연 {values[1]}, 독무 {values[2]}, 독룡 {values[3]}, 독천 {values[5]}, 혈독 {values[4]}레벨\n"
+                f"독계 위력 {values[0]:+d}%. 독연·독룡·혈독 75%로 3턴 중독.\n"
+                "독무·독천 50%로 2턴 중독. 매 턴 최대 병력 10% 감소.")
     if number == 23:
         return f"받는 물리 피해 {values[0]}% 감소, 수계 면역\n받는 화계 피해 {values[1]}% 증가"
     if number == 19:
@@ -217,6 +228,10 @@ class TacticProject:
         self.script_refs = None
         self.awakenings = {}
 
+    @cached_property
+    def strategy_ranges(self):
+        return load_attack_ranges(self.base.folder / "script" / "jymain.lua")
+
     def row(self, game, kind, number):
         section, size, _ = SECTIONS[kind]
         start = game.offsets[section] + number * size
@@ -243,7 +258,12 @@ class TacticProject:
         raise ValueError("사용할 수 있는 보류 번호가 없습니다.")
 
     def skill_parameters(self, number):
-        return SKILL_PARAMETERS.get(number, ())
+        labels = SKILL_PARAMETERS.get(number, ())
+        if number in ELEMENT_SKILL_STRATEGIES:
+            levels = tuple(f"{self.fields('M', mid)[0] or f'책략 #{mid}'} 습득 레벨"
+                           for mid in ELEMENT_SKILL_STRATEGIES[number])
+            return (*labels, *levels)
+        return labels
 
     def skill_values(self, number):
         return self.decode_skill_values(number, self.fields("S", number)[2])
@@ -301,6 +321,8 @@ class TacticProject:
         # These IDs are also selected from hard-coded tables and ranges during battle.
         if kind == "M" and 1 <= number <= 46:
             found.append("기본 전투 규칙 · 기존 책략 선택 및 시전")
+        if kind == "M" and number in POISON_STRATEGIES:
+            found.append("특기 #39 독계 · 책략 습득과 중독")
         for story, game in self.games.items():
             if kind == "S":
                 for pid in range(1, (game.offsets[1] - game.offsets[0]) // 152):
@@ -367,6 +389,10 @@ class TacticProject:
                 for i, (_, minimum, maximum) in enumerate(SKILL_SETTINGS.get(number, ())):
                     if not minimum <= settings[i] <= maximum:
                         raise ValueError(f"{labels[i]}은 {minimum}~{maximum} 사이로 입력하세요.")
+                if number in ELEMENT_SKILL_STRATEGIES and any(not 0 <= level <= 99 for level in values[1:]):
+                    raise ValueError("책략 습득 레벨은 0~99 사이로 입력하세요. 0은 요술사 기본값입니다.")
+                if number == 39 and any(not 1 <= level <= 99 for level in values[1:]):
+                    raise ValueError("독계 책략 습득 레벨은 1~99 사이로 입력하세요.")
                 description = skill_description(number, original_text, settings) if tuple(values) != before else original_text
             if kind == "S" and number in (26, 27, 28) and values[0] < 1:
                 raise ValueError("병력 손실 구간은 1% 이상이어야 합니다.")

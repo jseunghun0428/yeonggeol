@@ -56,11 +56,11 @@ for n,g in ipairs(gifts()[pid]) do
 local v=p[g[1]]
 if REAL[v] then p[g[1]]=0 v=0 changed=true end-- a copy put back (storyhire parking)
 if n<=a then
-if not find(p,g[2]) then
+if not find(p,g[2]) and not (koTreasureReserves and koTreasureReserves(pid,g[2])) then
 local k=(v==0) and g[1] or find(p,0)
 if k then p[k]=g[2] changed=true end
 end
-elseif v==g[2] then p[g[1]]=0 changed=true
+elseif v==g[2] and not (koTreasureKeeps and koTreasureKeeps(pid,v)) then p[g[1]]=0 changed=true
 end
 end
 return changed
@@ -98,7 +98,7 @@ if g then
 local p=JY.Person[pid]
 for _,s in ipairs(g) do
 local k=(p[s[1]]==s[2]) and s[1] or find(p,s[2])
-if k then p[k]=0 end
+if k and not (koTreasureKeeps and koTreasureKeeps(pid,p[k])) then p[k]=0 end
 end
 end
 end

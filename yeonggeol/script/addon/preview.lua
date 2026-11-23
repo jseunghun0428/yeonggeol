@@ -456,7 +456,7 @@ local M=JY.Magic[mid]
 local kind=M[koPK_MTYPE]
 local p1=JY.Person[War.Person[scl].id]
 local r={kind=kind,name=M[koPK_MNAME],item=item,targets={},aid=between(kind,6,8)}
-r.cost=item and 0 or koStrategyMPCost(scl,M[koPK_MCOST],true)
+r.cost=item and 0 or koStrategyMPCost(scl,M[koPK_MCOST])
 r.mp=p1[koPK_MP]
 local arr=WarGetAtkFW(War.Person[eid].x,War.Person[eid].y,M[koPK_MEFW])
 local ids={}

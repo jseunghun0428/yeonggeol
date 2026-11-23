@@ -112,6 +112,7 @@ local function base(v) local f=rawget(_G,"koItemBaseId") if f and type(v)=="numb
 local function findBag(pid,it) local p=JY.Person[pid] for k=1,8 do if p[ITEM..k]==it or base(p[ITEM..k])==it then return k end end end
 -- 아군 가방 · 장비 · 창고에 있는 도구 번호 모음 (한 번 훑어 OWNSET 에, 바뀌는 곳에서 OWNSET=nil)
 local OWNSET=nil
+function koGearInvalidateOwnership() OWNSET=nil end
 local function ownSet()
 if OWNSET then return OWNSET end
 local t={}
@@ -126,7 +127,7 @@ if rawget(_G,"koStoreList") then for _,s in ipairs(koStoreList()) do t[s.iid]=tr
 OWNSET=t
 return t
 end
-local function ownedId(id) if not id or id<=0 then return false end return ownSet()[id]==true end
+local function ownedId(id) if not id or id<=0 then return false end return ownSet()[id]==true or (koTreasureHasReserved and koTreasureHasReserved(id)) end
 local function owned(e) return ownedId(e[2]) or ownedId(e[3]) end
 local function box(s) WarDrawStrBoxConfirm(s,M_White,JY.Status~=GAME_WMAP) end
 
@@ -354,7 +355,7 @@ local ch=false
 -- 남의 전용 보물은 비우고, 자기 것은 둠 (관우 · 장비는 newgame 가방에 원래 듦, 적일 때 받은 자기 것도 합류하면 그대로 지급분) — 자기 ★ 은 원본으로
 for s=1,8 do
 local v=p[ITEM..s] local k=v and (BYITEM[base(v)] or BYSTAR[base(v)])
-if k then
+if k and not (koTreasureKeeps and koTreasureKeeps(i,v)) then
 local sr=(D[k][1]~=p[NAME]) and sharedRow(k,p[NAME]) or nil
 if D[k][1]~=p[NAME] and not sr then p[ITEM..s]=0 ch=true
 elseif v==D[k][3] and not earned(k) and not (sr and earned(sr)) then p[ITEM..s]=D[k][2] ch=true end
@@ -392,7 +393,8 @@ local p=JY.Person[i]
 for s=1,8 do
 local v=p[ITEM..s] local k=v and v>0 and BYITEM[v]
 local sr=k and D[k][1]~=p[NAME] and sharedRow(k,p[NAME]) or nil-- 11-16: 함께 쓰는 줄(조운)도 각성 표시가 있으면 ★ 으로 (지워진 청강검★ 되찾기)
-if k and D[k][3]>0 and (D[k][1]==p[NAME] or sr) and (earned(k) or (sr and earned(sr))) and not starAnywhere(D[k][3]) then
+if k and D[k][3]>0 and (D[k][1]==p[NAME] or sr) and (earned(k) or (sr and earned(sr))) and not starAnywhere(D[k][3])
+and not (p[LORD]~=1 and koTreasureKeeps and koTreasureKeeps(i,v)) then
 p[ITEM..s]=D[k][3]
 for _,q in ipairs(EQUIP) do if p[q]==v then p[q]=D[k][3] end end
 pcall(ReSetAttrib,i,false)
@@ -411,7 +413,7 @@ if not have() then return end
 for _,v in pairs(War.Person or {}) do
 if v.enemy and v.id and JY.Person[v.id][LORD]~=1 then
 local p=JY.Person[v.id] local ch=false
-for s=1,8 do local k=BYSTAR[p[ITEM..s] or 0] if k and D[k][1]==p[NAME] and earned(k) then p[ITEM..s]=D[k][2] ch=true end end
+for s=1,8 do local k=BYSTAR[p[ITEM..s] or 0] if k and D[k][1]==p[NAME] and earned(k) and not (koTreasureKeeps and koTreasureKeeps(v.id,p[ITEM..s])) then p[ITEM..s]=D[k][2] ch=true end end
 for _,q in ipairs(EQUIP) do local k=BYSTAR[p[q] or 0] if k and D[k][1]==p[NAME] and earned(k) then p[q]=D[k][2] ch=true end end
 if ch then pcall(ReSetAttrib,v.id,false) OWNSET=nil end
 end
@@ -668,8 +670,9 @@ for _,k in ipairs((p and ROWS[p[NAME]]) or {}) do
 local e=D[k]
 for _,q in ipairs(EQUIP) do
 local v=base(p[q])
-if e[3]>0 and v==e[3] and e[6]==sid then return true end
-if (e[9] or 0)>0 and e[9]==sid and (v==e[2] or v==e[3]) then return true end
+if e[3]>0 and v==e[3] and e[6]>0 and e[6]==sid then return true end
+local sharedSkill=e[10] or e[9] or 0 -- [9] still distinguishes a shared owner
+if (e[9] or 0)>0 and sharedSkill>0 and sharedSkill==sid and (v==e[2] or v==e[3]) then return true end
 end
 end
 return false
@@ -767,9 +770,14 @@ end
 function koGearMoveOldT() return moveOld() end-- for test scripts
 -- 이야기 사건이 주는 도구: 옛 번호는 새 번호로, 전용 보물이면 한 회차에 한 번 (이미 지급 · 우리 편이 가짐 → 건너뜀, 처음 → 지급 비트)
 local DUPGOLD=1000
-local function storyGive(raw,who,item,...)
+local function storyGive(raw,who,pid,item,...)
 item=MOVE[item] or item
 local k=BYITEM[item]
+if koTreasureStoryGive and koTreasureStoryGive(pid,item) then
+if k then setGift(k) end
+OWNSET=nil
+return true
+end
 if not k or not have() then return raw(who,item,...) end
 OWNSET=nil
 -- 11-08 카페 제보 (하비 보물고 방천화극이 안 먹어짐): 우리 편이 이미 가졌으면 그냥 건너뛰던 것을 알려 주고,
@@ -793,8 +801,8 @@ return r
 end
 do
 local gi,wgi=rawget(_G,"GetItem"),rawget(_G,"WarGetItem")
-if type(gi)=="function" then function GetItem(pid,item,...) return storyGive(gi,pid,item,...) end end
-if type(wgi)=="function" then function WarGetItem(wid,item,...) return storyGive(wgi,wid,item,...) end end
+if type(gi)=="function" then function GetItem(pid,item,...) return storyGive(gi,pid,pid,item,...) end end
+if type(wgi)=="function" then function WarGetItem(wid,item,...) local unit=War.Person[wid] return storyGive(wgi,wid,unit and unit.id,item,...) end end
 end
 
 -- ---------------------------------------------------------------- 불러오기 · 전투 끝

@@ -16,7 +16,6 @@ local NAME=string.char(208,213,195,251)      -- 姓名
 local LORD=string.char(190,253,214,247)      -- 君主
 local ITEM=string.char(181,192,190,223)      -- 道具 (..1~8)
 local EQUIP={string.char(206,228,198,247),string.char(183,192,190,223),string.char(184,168,214,250)}-- 武器 防具 辅助
-local DESC=string.char(203,181,195,247)      -- 说明
 local INAME=string.char(195,251,179,198)     -- 名称
 local KIND={"\129\073\131\071","\130\117\130\118\129\073\131\071","\134\104\129\149","\130\126\131\087","\131\115\129\118","\136\124","\129\120\129\113"}
 local BYID,BYSTAR={},{}
@@ -254,8 +253,8 @@ local function detail(k)
 	local ow=(e[4]~="") and e[4] or nil
 	local info=KIND[e[3]]..((ow and (" \161\164 \130\075\129\106 "..ow)) or " \161\164 \133\073\133\065 \131\115\131\065 (\130\069\131\123 \130\097\130\077)")
 	-- 원본 줄 나누기: 소개 한 줄 · 옵션 · 각성 조건
-	local oL=split(JY.Item[e[1]] and JY.Item[e[1]][DESC])
-	local sL=(e[2]>0) and split(JY.Item[e[2]] and JY.Item[e[2]][DESC]) or {}
+	local oL=split(koItemDescription(e[1]))
+	local sL=(e[2]>0) and split(koItemDescription(e[2])) or {}
 	if #sL>0 and string.sub(sL[1],1,#"\130\069\131\123\129\111 ")=="\130\069\131\123\129\111 " then table.remove(sL,1) end
 	local inStar={} for _,l in ipairs(sL) do inStar[l]=true end
 	local flavor=nil

@@ -131,6 +131,11 @@ end
 
 -- ---------------------------------------------------------------- 주차
 function koStoryParked(p) local s=p and SLOT[p] return s~=nil and have() and raw(s,O_FACE)>0 end
+function koStoryParkedTreasureHolders()
+local holders={}
+if have() then for p,s in pairs(SLOT) do if raw(s,O_FACE)>0 then holders[p]=s end end end
+return holders
+end
 local function park(p)
 local s=SLOT[p]
 if not s or JY.Person[p][LORD]~=1 or raw(s,O_FACE)>0 then return end

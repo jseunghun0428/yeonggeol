@@ -70,4 +70,5 @@ return {
 {"uhui",true}, -- 군웅록 (11-06): 숨은 무장 우희 · 외전 해하의 밤
 {"bgm",true}, -- 군웅록 (11-03): 새 배경 음악 (sound/B###.mp3 133곡, 이야기 · 모드별 묶음, 기능설정 「배경 음악」 새 곡/원본) — 맨 끝(모드 함수 감쌈)
 {"officer_editor",true}, -- Apply explicit developer battle appearances after the normal sprite rules.
+{"treasure_inventory",true}, -- Story treasure ownership and next-cycle placement, after engraving restores its copies.
 }

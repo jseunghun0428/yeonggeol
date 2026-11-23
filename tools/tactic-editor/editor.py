@@ -8,8 +8,9 @@ from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageTk
 from lupa.lua52 import LuaError
 
-from tactic_data import (CONDITIONS, EFFECTS, EVENTS, FIELDS, RECOVERY_PARAMETERS, STRATEGY_KINDS, TARGETS,
-                         TacticProject, effect_frames, skill_description)
+from tactic_data import (CONDITIONS, EFFECTS, ELEMENT_SKILL_STRATEGIES, EVENTS, FIELDS,
+                         RECOVERY_PARAMETERS, STRATEGY_KINDS, TARGETS, TacticProject,
+                         effect_frames, skill_description)
 
 
 class Editor(tk.Tk):
@@ -189,11 +190,25 @@ class Editor(tk.Tk):
         self.values = [tk.StringVar(self, value=str(value)) for value in values]
         if self.kind == "S":
             self.render_skill_parameters(fields, source)
+            if source == 39:
+                def update_poison_description(*_):
+                    try:
+                        numbers = [int(value.get()) for value in self.values]
+                    except ValueError:
+                        return
+                    self.description.configure(state="normal")
+                    self.description.delete("1.0", "end")
+                    self.description.insert("1.0", skill_description(source, description, numbers))
+                    self.description.configure(state="disabled")
+
+                for value in self.values:
+                    value.trace_add("write", update_poison_description)
             if self.rules:
                 self.render_rules(data_page)
         else:
-            for i, (title, value) in enumerate(zip(FIELDS["M"], self.values)):
-                row, col = divmod(i, 2)
+            for position, i in enumerate((0, 1, 2, 5, 6)):
+                title, value = FIELDS["M"][i], self.values[i]
+                row, col = divmod(position, 2)
                 ttk.Label(fields, text=title).grid(row=row, column=col*2, sticky="w", padx=(0, 6), pady=3)
                 if i == 0:
                     choices = {f"{n} · {label}": str(n) for n, label in enumerate(STRATEGY_KINDS, 1)}
@@ -205,6 +220,7 @@ class Editor(tk.Tk):
                     field = ttk.Entry(fields, textvariable=value, width=12, state="readonly" if i == 5 else "normal")
                 field.grid(row=row, column=col*2+1, sticky="w", padx=(0, 16), pady=3)
         if self.kind == "M":
+            self.render_strategy_ranges(data_page)
             rule_page = ttk.Frame(tabs, padding=10)
             tabs.add(rule_page, text="발동 규칙")
             self.render_rules(rule_page)
@@ -216,15 +232,72 @@ class Editor(tk.Tk):
             self.render_learning(learning)
         self.original = self.snapshot()
 
+    def render_strategy_ranges(self, parent):
+        try:
+            ranges = self.project.strategy_ranges
+        except (OSError, ValueError, LuaError):
+            ranges = {}
+
+        radius = max((max(abs(x), abs(y)) for tiles in ranges.values() for x, y in tiles), default=0)
+        cell_size = 18
+        side = (radius * 2 + 1) * cell_size
+        choices = {number: (f"범위 {number} · {len(tiles)}칸" if tiles else f"범위 {number} · 표시할 칸 없음")
+                   for number, tiles in ranges.items()}
+        if not ranges:
+            choices = {number: f"범위 {number}" for number in range(27)}
+        previews = ttk.Frame(parent)
+        previews.pack(fill="x")
+
+        def preview(index, origin, fill):
+            value = self.values[index]
+            panel = ttk.LabelFrame(previews, text=FIELDS["M"][index], padding=8)
+            panel.pack(side="left", anchor="n", padx=(0, 12))
+            current = int(value.get())
+            options = choices.copy()
+            options.setdefault(current, f"범위 {current} · 미지원")
+            numbers = list(options)
+            picker = ttk.Combobox(panel, values=tuple(options.values()), state="readonly", width=23)
+            picker.current(numbers.index(current))
+            picker.pack(fill="x", pady=(0, 6))
+            picker.bind("<<ComboboxSelected>>", lambda event: value.set(str(numbers[event.widget.current()])))
+            if not ranges:
+                return
+            canvas = tk.Canvas(panel, width=side + 1, height=side + 1, highlightthickness=0)
+            canvas.pack()
+            ttk.Label(panel, text=f"● {origin}").pack(anchor="w", pady=(4, 0))
+
+            def draw(*_):
+                tiles = ranges.get(int(value.get()), set())
+                canvas.delete("all")
+                for y in range(-radius, radius + 1):
+                    for x in range(-radius, radius + 1):
+                        left, top = (x + radius) * cell_size, (y + radius) * cell_size
+                        highlighted = (x, y) in tiles
+                        canvas.create_rectangle(left, top, left + cell_size, top + cell_size,
+                                                fill=fill if highlighted else "#f8fafc", outline="#94a3b8",
+                                                tags=("range_tile",) if highlighted else ())
+                center = radius * cell_size + cell_size / 2
+                canvas.create_oval(center - 3, center - 3, center + 3, center + 3, fill="#0f172a", outline="")
+
+            value.trace_add("write", draw)
+            draw()
+
+        preview(3, "시전자 위치", "#93c5fd")
+        preview(4, "선택한 대상 위치", "#86efac")
+        if not ranges:
+            ttk.Label(parent, text="게임 스크립트에서 범위 미리보기를 불러올 수 없습니다.").pack(anchor="w")
+
     def render_skill_parameters(self, parent, number):
         parameters = [(i, label) for i, label in enumerate(self.project.skill_parameters(number)) if label]
-        frame = ttk.LabelFrame(parent, text="효과 수치", padding=8)
+        frame = ttk.LabelFrame(parent, text="독계 강화·책략 습득" if number == 39 else "효과 수치", padding=8)
         frame.pack(fill="x")
         for row, (i, name) in enumerate(parameters):
             ttk.Label(frame, text=name).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=2)
             ttk.Entry(frame, textvariable=self.values[i], width=12).grid(row=row, column=1, sticky="w")
         if not parameters and not self.rules:
             ttk.Label(frame, text="조절할 수치가 없는 효과입니다.").pack(anchor="w")
+        if number in ELEMENT_SKILL_STRATEGIES:
+            ttk.Label(parent, text="습득 레벨을 0으로 두면 요술사 습득 레벨을 따릅니다.").pack(anchor="w", pady=(6, 0))
         if number in RECOVERY_PARAMETERS:
             ttk.Label(parent, text="회복 배율 100%는 게임의 기본 회복량입니다.").pack(anchor="w", pady=(6, 0))
 
