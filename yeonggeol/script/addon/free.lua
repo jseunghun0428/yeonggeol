@@ -2065,17 +2065,11 @@ local B_ATKWAV="\185\165\187\247\210\244\208\167"-- 攻击音效
 local B_MOVE="\210\198\182\175"-- 移动
 local B_SPEED="\210\198\182\175\203\217\182\200"-- 移动速度
 local B_RANGE="\185\165\187\247\183\182\206\167"-- 攻击范围
--- the class chain the game applies to enemies by level (15: 1>2 4>5 7>8 10>11 23>24, 30: one step more)
-local function koFreeChain(bz,lv)
-if lv>=15 then bz=({[1]=2,[4]=5,[7]=8,[10]=11,[23]=24})[bz] or bz end
-if lv>=30 then bz=({[2]=3,[5]=6,[8]=9,[11]=12,[24]=25})[bz] or bz end
-return bz
-end
 -- set a general's level (and class from its base class), then refresh its stats / battle unit at full strength
 function koFreeSetLevel(pid,lv,basebz)
 local p=JY.Person[pid]
 p[F_LV]=limitX(lv,1,99)
-if basebz and basebz>0 and not koFixedBZ(pid) then p[F_BZ]=koFreeChain(basebz,p[F_LV]) end
+if basebz and basebz>0 and not koFixedBZ(pid) then p[F_BZ]=basebz end
 local wid=GetWarID(pid)
 if wid>0 then
 local v=War.Person[wid]

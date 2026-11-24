@@ -2,7 +2,6 @@
 --   원작에서 병종을 바꾸는 도구 16종(검술지침서·둔갑천서 …)은 도구점에 없고 전장의 숨은 도구나
 --   이벤트로만 나와, 한 회차에 한 번 지나치면 그만이었다(도구 자체의 값이 255 = 1바이트 상한이라
 --   상점에 올려도 2,550금밖에 못 매긴다). 그래서 도구 대신 메뉴에서 금을 받고 바꿔 준다.
---   계열 안에서 한 단계 올리는 승급 도구 8종(보병갑·마갑 …)은 예전처럼 도구점에서 사면 된다.
 --   목인(388)·유방(407)·항우(408)은 전용 병종이라 koFixedBZ 로 목록에서 빠지고,
 --   그들의 병종(나무인형 29·서초패왕 30·한고제 31)도 고를 수 있는 병종에 넣지 않는다.
 if not koNeeds("base") then return end
@@ -16,7 +15,7 @@ local F_MP=string.char(178,223,194,212)    -- 策略
 local F_MPM=string.char(215,238,180,243,178,223,194,212) -- 最大策略
 local F_BNAME=string.char(195,251,179,198) -- 名称
 
--- 바꿀 수 있는 병종과 값. 승급 계열(2·3·5·6·8·9·11·12)은 도구점 몫이라 넣지 않는다
+-- 기존 전직 도구의 병종과 가격. 통합 계열은 메뉴에서 최종 병종으로 표시한다.
 --   고를 수 있는 병종 16종 = 전직 도구 16종이 주는 병종 그대로. 도구 이름과 병종 이름이 다른 것이 있다
 --   (창술지침서 -> 호위병, 궁기지침서 -> 돌기병, 청낭서 -> 보급대).
 local koBzPrice={
@@ -42,7 +41,8 @@ local koBzPrice={
 
 local function koBzList()
 local t={}
-for bz,price in pairs(koBzPrice) do
+for base,price in pairs(koBzPrice) do
+local bz=koFinalTroop(base)
 local b=JY.Bingzhong[bz]
 if b~=nil and b[F_BNAME]~="" then t[#t+1]={bz=bz,price=price,name=b[F_BNAME]} end
 end

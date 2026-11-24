@@ -313,7 +313,6 @@ P[LV]=lv
 -- 10-20 (「이숙 같은 경우」 점검): the record's class is the newgame one, not the class he joins with in the story (the 도감 shows that one):
 --  이명·조하 join as the 맹수사 / 산적 of their battle; and like a tavern copy he is promoted by the tavern level (1단 → 2·3단)
 if STORYBZ[p] then P[BZ]=STORYBZ[p] end
-if rawget(_G,"koTavernPromote") then pcall(koTavernPromote,p,true) end
 t[#t+1]=p
 end
 end

@@ -57,10 +57,11 @@ local function tierOf(bz)
 	if bz>=23 and bz<=25 then return bz-22 end
 	return nil
 end
-local function fit(kind,bz,tier)
+local function fit(kind,bz)
+	bz=koFinalTroop(bz)
 	if FIT[kind][bz] then return bz end
 	if SINGLE[kind] then return SINGLE[kind] end
-	return BASE[kind]+(tierOf(bz) or tier or 1)
+	return koFinalTroop(BASE[kind]+1)
 end
 koSpriteFit=fit
 local BZ="\177\248\214\214"                   -- class
@@ -154,18 +155,18 @@ koSpriteReach,koSpriteKeepOwn=reach,keepOwn
 local se=SelectEnemy
 function SelectEnemy(T)
 	if type(T)=="table" then
-		local mt=1   -- untiered old class -> tier 1, the engine promotes enemies at level 15 / 30 (zongheng) right after
 		for i=1,99 do
 			local idx=(i-1)*11
 			if T[idx+11]==nil then break end
 			local p=T[idx+1] and T[idx+1]>=0 and T[idx+1]+1
 			if p and campWI() then p=src(p) end   -- 군웅록: a story row stands for its 영걸전 person
 			local k=p and KIND[p]
-			if k and (T[idx+7]~=21 or FORCE21[p]) then
-				local nb=fit(k,T[idx+7],mt)
+			local own=koFinalTroop(T[idx+7])
+			if k and (own~=21 or FORCE21[p]) then
+				local nb=fit(k,own)
 				local ai=T[idx+5]
 				-- 10-17: keep the own class where the sprite's class is shut out of much of the map (see keepOwn)
-				if nb~=T[idx+7] and keepOwn(T[idx+7],nb,T[idx+2]+1,T[idx+3]+1,ai,T[idx+8]+1,T[idx+9]+1) then nb=T[idx+7] end
+				if nb~=own and keepOwn(own,nb,T[idx+2]+1,T[idx+3]+1,ai,T[idx+8]+1,T[idx+9]+1) then nb=own end
 				T[idx+7]=nb
 			end
 		end
@@ -178,7 +179,7 @@ end
 local LORD="\190\253\214\247"
 local ORIG=nil   -- pid -> newgame class (read once)
 -- 10-20: an ally from before the change still has the old newgame class (이명 단병, 조하 궁병 → 단병): fit him too
-local OLDNG={[376]={[1]=true},[224]={[4]=true,[1]=true}}
+local OLDNG={[376]={[3]=true},[224]={[6]=true,[3]=true}}
 local function origBz(s,pid)
 	if campWI() then   -- 군웅록: the story's own newgame record of this person
 		return JY.Data_Person_Base and pid and GetDataFromStruct(JY.Data_Person_Base,pid*CC.PersonSize,CC.Person_S,BZ) or nil
@@ -195,7 +196,7 @@ local function origBz(s,pid)
 			for q in pairs(KIND) do ORIG[q]=GetDataFromStruct(b,q*CC.PersonSize,CC.Person_S,BZ) end
 		end)
 	end
-	return ORIG[s]
+	return koFinalTroop(ORIG[s])
 end
 function koSpriteClassFix()
 	if not JY.Person then return end
@@ -214,9 +215,7 @@ function koSpriteClassFix()
 		--  조형 병종(단병)으로 다시 맞췄음 → 이미 옮긴 무장은 건드리지 않음
 		if s and p and p[LORD]==1 and campWI() then local cd=rawget(_G,"koWujeClassDone") local dn=cd and cd() if dn and dn[pid] then s=nil end end
 		if s and p and p[BZ] and p[BZ]>0 and (p[BZ]~=21 or FORCE21[s]) then
-			local lv=p[LV] or 1
-			local t=(lv<15 and 1) or (lv<30 and 2) or 3   -- same levels as the engine's enemy promotion
-			p[BZ]=fit(KIND[s],p[BZ],t)
+			p[BZ]=fit(KIND[s],p[BZ])
 		end
 	end
 	-- 10-20 (「이숙 같은 경우」 점검): 관우 외전 tavern generals 391~396 (공수·한복·맹탄·변희·왕식·진기) in an older save keep the class
@@ -274,21 +273,3 @@ function GetPic(pid,enemy,friend)
 	end
 	return r
 end
--- 10-11: a tavern general (copy 421+) comes at the team's level but kept the base record's first-tier class; promote him the
--- way the engine promotes enemies (level 15 -> tier 2, 30 -> tier 3) for the tiered families. Never demotes; after hiring the
--- usual item promotion applies. Runs in the tavern's lock check (called for each slot not hired yet, right after the copy).
-local PROMO={[1]=2,[4]=5,[7]=8,[10]=11,[23]=24,[2]=3,[5]=6,[8]=9,[11]=12,[24]=25}
-local NEED={[1]=15,[4]=15,[7]=15,[10]=15,[23]=15,[2]=30,[5]=30,[8]=30,[11]=30,[24]=30}
-function koTavernPromote(i,any)   -- any: 10-20, a story general offered by the storyhire tavern (his own record, below 421)
-	local p=i and (i>420 or any) and JY.Person[i]
-	if not p or p[BZ]==nil or p["\190\253\214\247"]==1 then return end   -- 君主 1 = already hired
-	local lv=p[LV] or 1
-	local bz=p[BZ]
-	while PROMO[bz] and lv>=NEED[bz] do bz=PROMO[bz] end
-	if bz~=p[BZ] then
-		p[BZ]=bz
-		ReSetAttrib(i,true)
-		p[SPR]=GetPic(i,false,false)
-	end
-end
-koOn("tavern_slot_lock",function(i) pcall(koTavernPromote,i) return nil end)

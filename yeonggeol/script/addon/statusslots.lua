@@ -24,8 +24,6 @@ local ITEM=K(181,192,190,223)           -- 道具 (1~8)
 local LORD=K(190,253,214,247)           -- 君主
 local LABEL={"\129\073\131\071","\132\078\130\083\130\119","\131\115\129\118"}
 local EXCLUSIVE="\130\066\132\111"
--- jymain ReSetAttrib 의 koEquipAlias (local 이라 여기 베낌): 새 병종이 장비를 빌려 쓰는 원래 병종
-local ALIAS={[30]=9,[31]=3,[32]=16,[33]=4,[34]=27,[35]=16,[36]=29,[37]=4}
 
 -- ---------------------------------------------------------------- 수동 장비
 local function canUse(p,iid)
@@ -35,7 +33,7 @@ local function canUse(p,iid)
 	if not ok then
 		for n=1,7 do
 			local b=it[NEEDBZ..n]
-			if b==p[BZ] or (ALIAS[p[BZ]] and b==ALIAS[p[BZ]]) then ok=true break end
+			if koEquipmentClassMatches(b,p[BZ]) then ok=true break end
 		end
 	end
 	if p[LV]<(it[NEEDLV] or 0) then ok=false end

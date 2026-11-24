@@ -6582,10 +6582,6 @@ talk(64,"‚K‚J, ‰Bn[ŠV‚TZ.");
  RemindSave();
  PlayBGM(12);
 talk(64,"ƒLƒP K‚pS …HS‚C ‚Z‹{LM. ‚_‚AS ‹s…c‚V‚CZ.");
-if JY.Person[54]["\177\248\214\214"]~=7 then--ko 5.1 storyhire (10-14): already ours (hired in the inn)
-else
- ModifyBZ(54,8);
-end--ko 5.1 storyhire
  koStoryScenarioLevelUp(54,7);
  WarIni();
  DefineWarMap(16,"d2ƒa …B‚K ‚B„e","1. ‡jD ‚p…D*2. ‚G‚P^ ƒW…g ƒ{…^ DˆG",45,0,92);

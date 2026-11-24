@@ -23,7 +23,7 @@ end
 --  · 신무장 k(1~20) = 인물 칸 510+k (511~530). 세이브를 불러올 때마다 등록부 → 그 칸에 씀.
 --    이미 고용했거나(君主 1) 지난 회차에서 데려온(얼굴 있음·新头像代号 0) 칸은 세이브 값 그대로.
 --  · 술집: 제1장부터(新头像代号 23), 연고 마을 근처 주점 주인 목록 (town koTavernStay 가 koNewGenHome 을 물음), 호감 대화 없음.
---    레벨은 다른 술집 무장처럼 그때 우리 편 평균에 맞추고 병종은 레벨대로 승급(koTavernPromote).
+--    레벨은 다른 술집 무장처럼 그때 우리 편 평균에 맞춘다.
 --  · 계승: jymain koNG.carried / reset 이 511~530 은 「얼굴 있음·新头像代号 0」 으로 판단 (patch_신무장.pl).
 -- Build (game folder): perl "../\129\126\130\064\130\066\130\068\130\069 \130\071\130\072\130\070 5.0 \134\075\129\095\132\111/\134\075\129\095\132\111/\129\068\130\119/free_hz.pl" < "../\129\126\130\064\130\066\130\068\130\069 \130\071\130\072\130\070 5.0 \134\075\129\095\132\111/\134\075\129\095\132\111/addon/newgen_src.lua" > script/addon/newgen.lua
 local NG_MAX,NG_BASE,NG_UNLOCK,NG_TEMPLATE=20,510,(rawget(_G,"koCamp") and koCamp.ngUnlock) or 23,220
@@ -59,6 +59,7 @@ function koNewGenList()
 		for _,f in ipairs(F) do
 			if f=="name" or f=="home" then g[f]=unhex(t[f]) else g[f]=tonumber(t[f] or "") or 0 end
 		end
+		g.bz=koFinalTroop(g.bz)
 		if g.id>=1 and g.id<=NG_MAX and #g.name>0 then L[g.id]=g end
 	end
 	return L
@@ -145,7 +146,6 @@ koOn("tavern_slot_lock",function(i)
 			lv=limitX(lv,1,99)
 			if CC.Enhancement and rawget(_G,"pjlv") then local d=pjlv() if lv<d then lv=d end end
 			p[P.LV]=lv
-			if rawget(_G,"koTavernPromote") then pcall(koTavernPromote,i) end
 			pcall(ReSetAttrib,i,true)
 		end
 	end
@@ -570,7 +570,7 @@ local OFFICER_BACK_PIC=298
 local STAT_MAX,STAT_SUM,STAT_MIN,STAR_BUDGET=100,300,1,24   -- (10-15 사용자: 하나 100 · 합계 300 — 10-12 의 합계 240 · 하나 95 에서)
 -- 고를 수 있는 병종 (10-12 사용자: 숨겨진 장수 전용만 빼고 다 — 나무인형 29·서초패왕 30·한고제 31·마왕 32·흙인형 36, 마차 38·예비 39~ 제외).
 --  3단 계열(단병·궁병·경기병·산적·창병)은 1단만: 술집에 나올 때 레벨대로 승급
-local CLASSES={1,4,7,23,22,10,20,21,14,15,17,13,16,19,26,27,28,33,34,35,37}   -- (10-12 사용자: 민중 18 뺌)
+local CLASSES={3,6,9,25,22,12,20,21,14,15,17,13,16,19,26,27,28,33,34,35,37}   -- (10-12 사용자: 민중 18 뺌)
 local STARS={
 {7,9,13,14,18,21,22,41},{8,11,12,19,20,24,25,118},{2,10,29,31,42,103,105,111},{6,26,27,30,34,36,107,113},
 {16,17,28,33,35,44,112,117},{15,23,32,48,49,50,102,106},{3,4,39,45,46,108,110,119}}
@@ -940,7 +940,7 @@ local function townPick(cur)
     return nil
 end
 local function blank()
-	return {name="",sex=0,face=0,bz=1,wl=50,zl=50,ts=50,tf=0,s1=0,s2=0,s3=0,s4=0,s5=0,s6=0,home="",war=0,city=0,fig=0,aw=0}
+	return {name="",sex=0,face=0,bz=3,wl=50,zl=50,ts=50,tf=0,s1=0,s2=0,s3=0,s4=0,s5=0,s6=0,home="",war=0,city=0,fig=0,aw=0}
 end
 local function copy(g) local c={} for k,v in pairs(g) do c[k]=v end return c end
 local function regionOf(home)

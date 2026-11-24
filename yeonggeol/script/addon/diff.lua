@@ -11,7 +11,6 @@ local P_BL,P_MAXBL="\177\248\193\166","\215\238\180\243\177\248\193\166"-- 兵�
 local P_BZ="\177\248\214\214"-- 兵种
 local P_ITEM="\181\192\190\223"-- 道具
 local P_WL,P_ZL="\206\228\193\166","\214\199\193\166"-- 武力 智力
-local B_SND,B_ASND,B_MOV,B_MSPD,B_AFW="\210\244\208\167","\185\165\187\247\210\244\208\167","\210\198\182\175","\210\198\182\175\203\217\182\200","\185\165\187\247\183\182\206\167"
 local K_MJ,K_DIF="\195\216\188\188\49","\183\220\213\189"-- JY.Person[1]: 도전 모드 표시, 도전 난이도
 -- d = {적 병력 %, 적이 주는 피해 + %, 보상 + %}
 local DT={
@@ -227,33 +226,21 @@ ReSetAttrib(s,true)
 War.Person[w].pic=WarGetPic(w)
 end
 end
--- ---------------------------------------------------------------- 2: early class-up (put back when the battle ends), trial levels and 증원
-local UP={[1]=2,[2]=3,[4]=5,[5]=6,[7]=8,[8]=9,[10]=11,[11]=12,[23]=24,[24]=25}
-local oldBZ={}
+-- ---------------------------------------------------------------- 2: trial levels and 증원
 local rawSel=SelectEnemy
 function SelectEnemy(...)
 ended=false
 setup=true
 local r=table.pack(rawSel(...))
-local d=koDiffLv()
 local lvT=TV("lv")-TV("b_elv")
-for wid,v in pairs(War.Person) do
+for _,v in pairs(War.Person) do
 if v.enemy and v.id>0 and not v.koDiffUp then
 v.koDiffUp=true
 local p=JY.Person[v.id]
-local changed=false
-if lvT~=0 then p[P_LV]=math.max(1,math.min(99,(p[P_LV] or 1)+lvT)) changed=true end
-local nb=(d>=2) and UP[p[P_BZ]]
-if nb and JY.Bingzhong[nb] then
-if oldBZ[v.id]==nil then oldBZ[v.id]=p[P_BZ] end
-p[P_BZ]=nb
-local b=JY.Bingzhong[nb]
-v.bz=nb
-v.movewav=b[B_SND] v.atkwav=b[B_ASND] v.movestep=b[B_MOV] v.movespeed=b[B_MSPD] v.atkfw=b[B_AFW]
-v.pic=WarGetPic(wid)
-changed=true
+if lvT~=0 then
+p[P_LV]=math.max(1,math.min(99,(p[P_LV] or 1)+lvT))
+ReSetAttrib(v.id,true)
 end
-if changed then ReSetAttrib(v.id,true) end
 end
 end
 local rn=TV("reinf")
@@ -263,8 +250,6 @@ return table.unpack(r,1,r.n)
 end
 koOn("war_end",function()
 ended=true
-for id,bz in pairs(oldBZ) do JY.Person[id][P_BZ]=bz end
-oldBZ={}
 -- the records of this battle's enemies back to their own numbers (raw max, the real bag's weapon)
 if War and War.Person then
 for _,v in pairs(War.Person) do
@@ -277,7 +262,7 @@ spawned={}
 reinfDone=false
 rawMax={}
 end)
-koOn("record_load",function() setup=false ended=false oldBZ={} spawned={} reinfDone=false end)
+koOn("record_load",function() setup=false ended=false spawned={} reinfDone=false end)
 -- ---------------------------------------------------------------- damage (difficulty + trials)
 local function foeHit(a,b) return a and b and a.enemy and not b.enemy end
 local function ourHit(a,b) return a and b and not a.enemy and b.enemy end

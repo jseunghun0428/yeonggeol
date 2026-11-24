@@ -2200,6 +2200,13 @@ end
 end
 end
 
+local PERSON_CLASS="\177\248\214\214"
+local FINAL_TROOP={[1]=3,[2]=3,[4]=6,[5]=6,[7]=9,[8]=9,[10]=12,[11]=12,[23]=25,[24]=25}
+
+function koFinalTroop(bz)
+return FINAL_TROOP[bz] or bz
+end
+
 function koOfficerEdited(pid,flag)
 local edit=JY.OfficerOverrides and JY.OfficerOverrides[pid]
 return edit and math.floor(edit.mask/flag)%2==1
@@ -2298,6 +2305,20 @@ Byte.loadfile(JY.Data_Person, CC.R_GRPFilename[0],idx[1],CC.PersonSize*JY.Person
 Byte.loadfile(JY.Data_Person, CC.R_GRPFilename[id],idx[1],CC.PersonSize*JY.PersonNum-kodelta)
 else
 Byte.loadfile(JY.Data_Person, CC.R_GRPFilename[id],idx[1],CC.PersonSize*JY.PersonNum)
+end
+-- The warehouse and add-on records can store unrelated values at the class offset.
+local convertedTroops={}
+for _,data in ipairs({JY.Data_Person_Base,JY.Data_Person}) do
+for pid=1,JY.PersonNum-1 do
+if pid<762 or pid>801 then
+local offset=pid*CC.PersonSize
+local bz=GetDataFromStruct(data,offset,CC.Person_S,PERSON_CLASS)
+if FINAL_TROOP[bz] and GetDataFromStruct(data,offset,CC.Person_S,"姓名")~="" then
+SetDataFromStruct(data,offset,CC.Person_S,PERSON_CLASS,bz)
+if data==JY.Data_Person then convertedTroops[pid]=true end
+end
+end
+end
 end
 for i=0,JY.PersonNum-1 do
 JY.Person[i]={}
@@ -2421,6 +2442,7 @@ for i=0,count-1 do
 local slot=first+i
 JY.Bingzhong[slot]=setmetatable({},{
 __index=function(t,k)
+if FINAL_TROOP[slot] and k=="有效" then return 0 end
 return GetDataFromStruct(data,i*CC.BingzhongSize,CC.Bingzhong_S,k)
 end,
 __newindex=function(t,k,v)
@@ -2681,6 +2703,11 @@ end
 JY.Status=JY.Base["当前状态"]
 if JY.Base["战场存档"]==1 then
  WarLoad(id)
+else
+for pid in pairs(convertedTroops) do
+local p=JY.Person[pid]
+if p["君主"]==1 and p["等级"]>0 then ReSetAttrib(pid,false) end
+end
 end
 if JY.CurrentBGM>=0 then
 PlayBGM(JY.CurrentBGM)
@@ -2805,6 +2832,7 @@ end
 
 function SetDataFromStruct(data,offset,t_struct,key,v)--从数据的结构中翻译数据，保存数据
 local t=t_struct[key]
+if t_struct==CC.Person_S and key==PERSON_CLASS then v=koFinalTroop(v) end
 if t[2]==0 then
 if t[3]==1 then
 Byte.set8(data,t[1]+offset,v)
@@ -6383,7 +6411,10 @@ rule=nil
 local current=JY.Person[pid]["兵种"]
 for source=PROMOTION_SEAL,LAST_PROMOTION_ITEM do
 local candidate=JY.Item[source]
-if candidate[ITEM_REQUIRED_CLASS]==current then rule=candidate break end
+if candidate[ITEM_REQUIRED_CLASS]==current and koFinalTroop(candidate["效果"])~=current then
+rule=candidate
+break
+end
 end
 if not rule then
 PlayWavE(2)
@@ -6391,20 +6422,19 @@ WarDrawStrBoxDelay(PROMOTION_NAME..": \131\105\132\117 \129\113 \130\097\129\075
 return 0
 end
 end
-if not WarDrawStrBoxYesNo(string.format('俕俖俬 %s(僲)凷 僓剅丩丮.',JY.Bingzhong[rule["效果"]]["名称"]),M_White) then
+if not WarDrawStrBoxYesNo(string.format('俕俖俬 %s(僲)凷 僓剅丩丮.',JY.Bingzhong[koFinalTroop(rule["效果"])]["名称"]),M_White) then
 return 0
-elseif rule["需兵种"]>0 and JY.Person[pid]["兵种"]~=rule["需兵种"] then
+elseif rule["需兵种"]>0 and JY.Person[pid]["兵种"]~=koFinalTroop(rule["需兵种"]) then
 PlayWavE(2)
-WarDrawStrBoxDelay("剆乑: "..JY.Bingzhong[rule["需兵种"]]["名称"].."．",M_White)
+WarDrawStrBoxDelay("剆乑: "..JY.Bingzhong[koFinalTroop(rule["需兵种"])]["名称"].."．",M_White)
 return 0
 elseif JY.Person[pid]["等级"]<rule["需等级"] then
 PlayWavE(2)
 WarDrawStrBoxDelay("俁倇丟 俕凴乄丩丮.",M_White)
 return 0
 else
-local target=rule["效果"]
-WarBingZhongUp(War.SelID,target)
-if koIsPromotionItem(itemid) and JY.Person[pid]["兵种"]~=target then return 0 end
+local target=koFinalTroop(rule["效果"])
+if not WarBingZhongUp(War.SelID,target) then return 0 end
 for n=i,7 do
 JY.Person[pid]["道具"..n]=JY.Person[pid]["道具"..(n+1)]
 end
@@ -6713,9 +6743,10 @@ end
 -- true 克制 false 不被克制
 koBZAll={[30]=true,[31]=true,[32]=true}--ko 3.4: classes 30 and 31 win over every class (even between the two)
 function BZSuper(bz1,bz2)
+bz1,bz2=koFinalTroop(bz1),koFinalTroop(bz2)
 if koBZAll[bz1] or koBZAll[bz2] then return (koBZAll[bz1]==true) and not koBZAll[bz2] end--ko 3.4
 for i=1,9 do
-if JY.Bingzhong[bz1]["克制"..i]==bz2 then
+if koFinalTroop(JY.Bingzhong[bz1]["克制"..i])==bz2 then
 return true--bz1 克制 bz2
 end
 end
@@ -7708,11 +7739,13 @@ end
 
 function WarBingZhongUp(id,bzid)--兵种变更，动画
 if id==0 then
-return
+return false
 end
+local pid=War.Person[id].id
+bzid=koFinalTroop(bzid)
+if JY.Person[pid][PERSON_CLASS]==bzid then return false end
 local MenuPicNum=JY.MenuPic.num
 JY.MenuPic.num=0
-local pid=War.Person[id].id
 local oldaction=War.Person[id].action
 --使用物品动作
 War.Person[id].action=0
@@ -7762,6 +7795,7 @@ WarDrawStrBoxWaitKey(JY.Person[pid]["姓名"].."丟(乛) 傽匲働 僒刪丼 匳刱丮",M_Whi
 break
 end
 end
+return true
 end
 
 function limitX(x,minv,maxv)--限制x的范围
@@ -9081,6 +9115,11 @@ end
 --ko class 30 (Xiang Yu) equips like class 9, class 31 (Liu Bang, mounted lord) like class 3 (sword line)
 
 local koEquipAlias={[30]=9,[31]=3,[32]=16,[33]=4,[34]=27,[35]=16,[36]=29,[37]=4,[39]=27}
+function koEquipmentClassMatches(required,bz)
+local target=koFinalTroop(required)
+local alias=koEquipAlias[bz]
+return target==koFinalTroop(bz) or (alias~=nil and target==koFinalTroop(alias))
+end
 --ko 388 Mok-in / 407 Liu Bang / 408 Xiang Yu keep their exclusive class: no class change via trainer, battle debug menu or class-change items
 --ko 3.6: the Qiao sisters - Da Qiao (411) and Xiao Qiao (412) next to each other: strategy cost halved (as skill 112), aid strategies x1.3
 function koTwinOn(wid)
@@ -9512,7 +9551,7 @@ if JY.Item[item]["需兵种1"]==0 then
 canuse=true
 else
 for n=1,7 do
-if JY.Item[item]["需兵种"..n]==p["兵种"] or (koEquipAlias[p["兵种"]] and JY.Item[item]["需兵种"..n]==koEquipAlias[p["兵种"]]) then
+if koEquipmentClassMatches(JY.Item[item]["需兵种"..n],p["兵种"]) then
 canuse=true
 break
 end
@@ -15577,7 +15616,7 @@ if MOUSE.CLICK(x+111,y+55,x+111+48,y+55+48) then
 local bzkz="*丆儃:"
 for i=1,9 do
 if JY.Bingzhong[p["兵种"]]["克制"..i]>0 then
-bzkz=bzkz..JY.Bingzhong[JY.Bingzhong[p["兵种"]]["克制"..i]]["名称"].." "
+bzkz=bzkz..JY.Bingzhong[koFinalTroop(JY.Bingzhong[p["兵种"]]["克制"..i])]["名称"].." "
 end
 if i==9 and bzkz=="*丆儃:" then
 bzkz=""
@@ -18790,34 +18829,6 @@ if CC.Enhancement then
 			else
 				if War.Person[i].enemy then
 					JY.Person[War.Person[i].id]["等级"]=JY.Person[War.Person[i].id]["等级"]+JY.Person[1]["奋战"]
-				end
-			end
-			if War.Person[i].enemy then --纵横模式下，敌军按照等级自动升级兵种
-				if JY.Person[War.Person[i].id]["等级"]>=15 then
-					if JY.Person[War.Person[i].id]["兵种"]==1 then
-						JY.Person[War.Person[i].id]["兵种"]=2
-					elseif JY.Person[War.Person[i].id]["兵种"]==4 then
-						JY.Person[War.Person[i].id]["兵种"]=5
-					elseif JY.Person[War.Person[i].id]["兵种"]==7 then
-						JY.Person[War.Person[i].id]["兵种"]=8
-					elseif JY.Person[War.Person[i].id]["兵种"]==10 then
-						JY.Person[War.Person[i].id]["兵种"]=11
-					elseif JY.Person[War.Person[i].id]["兵种"]==23 then
-						JY.Person[War.Person[i].id]["兵种"]=24
-					end
-				end
-				if JY.Person[War.Person[i].id]["等级"]>=30 then
-					if JY.Person[War.Person[i].id]["兵种"]==2 then
-						JY.Person[War.Person[i].id]["兵种"]=3
-					elseif JY.Person[War.Person[i].id]["兵种"]==5 then
-						JY.Person[War.Person[i].id]["兵种"]=6
-					elseif JY.Person[War.Person[i].id]["兵种"]==8 then
-						JY.Person[War.Person[i].id]["兵种"]=9
-					elseif JY.Person[War.Person[i].id]["兵种"]==11 then
-						JY.Person[War.Person[i].id]["兵种"]=12
-					elseif JY.Person[War.Person[i].id]["兵种"]==24 then
-						JY.Person[War.Person[i].id]["兵种"]=25
-					end
 				end
 			end
 		end
